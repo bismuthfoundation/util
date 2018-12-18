@@ -1,11 +1,20 @@
-# Script for generating a blockchain snapshot (backup)
-# Snapshot block_height is rounded down to nearest 1000 block
-# Edit the path where the tar.gz file is created in snapshot.json
-# The script takes a while to run, screen job recommended, for example:
-# screen -d -mS snapshot python3 ledger_snapshot.py
-# Status info is output in file: snapshot.log
-# The node is restarted by the script as quickly as possible using:
-# screen -d -mS node python3 node.py
+"""
+Script for generating a blockchain snapshot (backup)
+Snapshot block_height is rounded down to nearest 1000 block
+Edit the path where the tar.gz file is created in snapshot.json
+Complete script mysnap for snapshot process (between -----):
+
+-----
+#!/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+cd /root/Bismuth
+python3 snapshot_create.py
+python3 ledger_verify.py
+python3 snapshot_upload.py
+-----
+
+The script above can be run as a cron entry: 30 19 * * * screen -d -mS mysnap /root/Bismuth/mysnap
+"""
 
 import os
 import sys
@@ -141,6 +150,6 @@ if __name__ == "__main__":
                     sha256.update(data)
 
             data = {'url': config['url'] + filename, 'filename': filename, 'timestamp': int(time.time()),
-                    'sha256': sha256.hexdigest(), 'block_height': block_height}
+                    'sha256': sha256.hexdigest(), 'block_height': block_height, 'valid': 'unknown'}
             with open(config['DB_PATH'] + 'ledger.json', 'w') as outfile:
                 json.dump(data, outfile)
