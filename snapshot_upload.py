@@ -11,7 +11,6 @@
 # screen -d -mS aws_upload python3 snapshot_upload.py
 
 import json
-import time
 import subprocess
 
 with open('snapshot.json') as json_data:
