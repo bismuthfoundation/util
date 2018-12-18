@@ -32,4 +32,4 @@ if data['valid'] == 'valid':
     print(cmd)
     push=subprocess.Popen(cmd, shell=True)
 else:
-    print('Ledger invalid')
+    print('Ledger not validated')
