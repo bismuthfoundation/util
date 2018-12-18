@@ -128,3 +128,19 @@ if __name__ == "__main__":
             tar.add(config['DB_PATH'] + "hyper.db", arcname='hyper.db')
             tar.add(config['DB_PATH'] + "ledger.db", arcname='ledger.db')
             tar.close()
+
+            app_log.info("Creating ledger.json file")
+            BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
+            sha256 = hashlib.sha256()
+
+            with open(config['DB_PATH'] + filename, 'rb') as f:
+                while True:
+                    data = f.read(BUF_SIZE)
+                    if not data:
+                        break
+                    sha256.update(data)
+
+            data = {'url': config['url'] + filename, 'filename': filename, 'timestamp': int(time.time()),
+                    'sha256': sha256.hexdigest(), 'block_height': block_height}
+            with open(config['DB_PATH'] + 'ledger.json', 'w') as outfile:
+                json.dump(data, outfile)
