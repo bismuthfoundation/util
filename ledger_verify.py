@@ -1,8 +1,8 @@
-# Run this script in the main ~/Bismuth folder
-# The script takes a while to run, screen job recommended, for example:
-# screen -d -mS verify python3 ledger_verify.py
-# Output in file: verify.log
-# If there are no warnings in verify.log, then the ledger is validated
+"""
+Run this script in the main ~/Bismuth folder
+If ledger is valid, data['valid'] = 'valid' in ledger.json
+Log stored in verify.log
+"""
 
 import sqlite3
 import base64
@@ -101,6 +101,8 @@ def verify_txs(app_log, db, full_ledger):
     except Exception as e:
         app_log.error("Error: {}".format(e))
         raise
+
+    return invalid
 
 
 def bin_convert(string):
@@ -231,6 +233,8 @@ def verify_blocks(app_log, db):
         app_log.info("Error: {}".format(e))
         raise
 
+    return invalid
+
 
 def check_block(block_height_new, miner_address, nonce, db_block_hash, diff0,
                 received_timestamp, q_received_timestamp, q_db_timestamp_last):
@@ -316,6 +320,8 @@ def verify_diff(app_log, db):
         app_log.info("Error: {}".format(e))
         raise
 
+    return invalid
+
 
 def verify_rewards(app_log, db):
     with sqlite3.connect(db) as ledger_check:
@@ -362,11 +368,27 @@ def verify_rewards(app_log, db):
         app_log.error("Error: {}".format(e))
         raise
 
+    return invalid
+
 
 if __name__ == "__main__":
     my_log = log.log("verify.log", "INFO", True)
 
-    verify_txs(my_log, 'static/ledger.db', True)
-    verify_blocks(my_log, 'static/ledger.db')
-    verify_diff(my_log, 'static/ledger.db')
-    verify_rewards(my_log, 'static/ledger.db')
+    invalid1 = verify_txs(my_log, 'static/ledger.db', True)
+    invalid2 = verify_blocks(my_log, 'static/ledger.db')
+    invalid3 = verify_diff(my_log, 'static/ledger.db')
+    invalid4 = verify_rewards(my_log, 'static/ledger.db')
+
+    with open('snapshot.json') as json_data:
+        config = json.load(json_data)
+
+    with open("{}/ledger.json".format(config['DB_PATH'])) as json_data:
+        data = json.load(json_data)
+
+    if invalid1 + invalid2 + invalid3 + invalid4 == 0:
+        data['valid'] = 'valid'
+    else:
+        data['valid'] = 'invalid'
+
+    with open(config['DB_PATH'] + 'ledger.json', 'w') as outfile:
+        json.dump(data, outfile)
