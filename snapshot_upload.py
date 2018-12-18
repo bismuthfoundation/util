@@ -31,9 +31,5 @@ if data['valid'] == 'valid':
     cmd="aws s3 cp {}{} {} --acl public-read".format(config['DB_PATH'],data['filename'],config['bucket'])
     print(cmd)
     push=subprocess.Popen(cmd, shell=True)
-    time.sleep(30)
-
-    url="https://hypernodes.bismuth.live/snapshot_reg.php?url={}&timestamp={}&sha256={}&block_height={}".format(data['url'],data['timestamp'],data['sha256'],data['block_height'])
-    r = requests.get(url)
 else:
     print('Ledger invalid')
