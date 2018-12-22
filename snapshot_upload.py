@@ -31,5 +31,6 @@ if data['valid'] == 'valid':
     cmd="aws s3 cp {}{} {} --acl public-read".format(config['DB_PATH'],data['filename'],config['bucket'])
     print(cmd)
     push=subprocess.Popen(cmd, shell=True)
+    push.wait()
 else:
     print('Ledger not validated')
