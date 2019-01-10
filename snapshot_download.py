@@ -242,7 +242,7 @@ def download_file(url, filename):
         raise
 
 if __name__ == '__main__':
-    url='http://127.0.0.1/snapshots.json'
+    url='https://hypernodes.bismuth.live/snapshots.json'
     resp = requests.get(url=url)
     data = resp.json()
 
