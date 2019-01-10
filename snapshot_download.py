@@ -13,6 +13,24 @@ STEP = 10000 #Print steps
 DB_START = 900000
 DB_HASH = "cec9b091d8fec7e6208947d17d9b5beaa308e170b9868be52186218f"
 
+def check_dupes(db):
+    with sqlite3.connect(db) as ledger_check:
+        ledger_check.text_factory = str
+        h3 = ledger_check.cursor()
+
+    h3.execute("SELECT * FROM transactions WHERE signature IN (SELECT signature FROM transactions WHERE signature != '0' GROUP BY signature HAVING COUNT(*) >1)")
+    results = h3.fetchall()
+
+    allowed_dupes = [708334,708335]
+
+    bok = True
+    for result in results:
+        if result[0] not in allowed_dupes:
+            print ('Duplicate signature in block ' + result[0])
+            bok = False
+
+    return bok
+
 def hash_blocks_until(db,n):
     """Returns combined hash of all block hashes in db until block_height n
     """
@@ -224,7 +242,7 @@ def download_file(url, filename):
         raise
 
 if __name__ == '__main__':
-    url='https://hypernodes.bismuth.live/snapshots.json'
+    url='http://127.0.0.1/snapshots.json'
     resp = requests.get(url=url)
     data = resp.json()
 
@@ -261,3 +279,7 @@ if __name__ == '__main__':
                 verify_blocks('static/ledger.db',DB_START)
                 print("---> Verifying mining difficulties")
                 verify_diff('static/ledger.db')
+                print("---> Looking for duplicate signatures")
+                bok = check_dupes('static/ledger.db')
+                if bok:
+                    print("No duplicate signatures found")
