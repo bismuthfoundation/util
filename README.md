@@ -7,3 +7,5 @@ Small useful utility programs
 * snapshot_download.py: Script to download and verify a snapshot.  
 
 These scripts can be combined in cronjobs, see instructions at top of snapshot_create.py
+
+* privkey_to_wallet.py: Small utility to create a wallet file (new format) from address and privkey (old format). Pubkey found from ledger.
