@@ -3,7 +3,6 @@ Script for generating a blockchain snapshot (backup)
 Snapshot block_height is rounded down to nearest 1000 block
 Edit the path where the tar.gz file is created in snapshot.json
 Complete script mysnap for snapshot process (between -----):
-
 -----
 #!/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -12,7 +11,6 @@ python3 snapshot_create.py
 python3 ledger_verify.py
 python3 snapshot_upload.py
 -----
-
 The script above can be run as a cron entry: 30 19 * * * screen -d -mS mysnap /root/Bismuth/mysnap
 """
 
@@ -28,7 +26,21 @@ import hashlib
 import tarfile
 import requests
 import connections
+from decimal import *
+from quantizer import *
 from shutil import copyfile
+
+
+def delete_ledger(filename):
+    try:
+        os.remove(filename)
+    except:
+        print('No such file {} to delete'.format(filename))
+
+def statusget(socket):
+    connections.send(s, "statusjson")
+    response = connections.receive(s)
+    return response
 
 
 def delete_column(db, block_height, column):
@@ -80,6 +92,49 @@ def vacuum(db):
         l.execute("vacuum")
         l.close()
 
+def dev_reward(ledger_cursor, block_height, block_timestamp_str, mining_reward, mirror_hash):
+    ledger_cursor.execute("INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                             (-block_height, block_timestamp_str, "Development Reward", "4edadac9093d9326ee4b17f869b14f1a2534f96f9c5d7b48dc9acaed",
+                              str(mining_reward), "0", "0", mirror_hash, "0", "0", "0", "0"))
+
+    ledger_cursor.execute("INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                             (-block_height, block_timestamp_str, "Hypernode Payouts", "3e08b5538a4509d9daa99e01ca5912cda3e98a7f79ca01248c2bde16",
+                              "8", "0", "0", mirror_hash, "0", "0", "0", "0"))
+
+# Written by bizzzy
+def redo_mirror_blocks():
+    conn = sqlite3.connect('static/ledger.db')
+    conn.text_factory = str
+    c = conn.cursor()
+    c.execute("SELECT max(block_height) from transactions;")
+    max_height = c.fetchone()[0]
+
+    c.execute("DELETE FROM transactions WHERE address = 'Development Reward'")
+    c.execute("DELETE FROM transactions WHERE address = 'Hypernode Payouts'")
+
+    for block_height in range(1,max_height+1):
+        if block_height % 10 == 0:
+            c.execute("SELECT * FROM transactions WHERE block_height = ? ORDER BY rowid", (block_height,))
+            tx_list_to_hash = c.fetchall()
+            mining_tx = tx_list_to_hash[-1]
+            timestamp = mining_tx[1]
+
+            if block_height < 800000:
+                mining_reward = 15 - (quantize_eight(block_height) / quantize_eight(1000000))
+            elif block_height < 10000000:
+                mining_reward = 15 - (quantize_eight(block_height) / quantize_eight(1000000 / 2)) - Decimal("0.8")
+                if mining_reward < 0:
+                    mining_reward = 0
+            else:
+                mining_reward = 0
+
+            if block_height % 100000 == 0:
+                print(block_height, timestamp, mining_reward)
+            mirror_hash = hashlib.blake2b(str(tx_list_to_hash).encode(), digest_size=20).hexdigest()
+            dev_reward(c, block_height, timestamp, mining_reward, mirror_hash)
+
+    conn.commit()
+
 
 if __name__ == "__main__":
     app_log = log.log("snapshot.log", "INFO", True)
@@ -103,8 +158,12 @@ if __name__ == "__main__":
     except Exception as e:
         app_log.info("Node Stopped\n")
 
-    if i < 100:
+    if i<100:
         time.sleep(60)
+
+        app_log.info("Redoing mirror blocks")
+        redo_mirror_blocks()
+
         copyfile("static/index.db", config['DB_PATH']+"index.db")
         copyfile("static/hyper.db", config['DB_PATH']+"hyper.db")
         copyfile("static/ledger.db", config['DB_PATH']+"ledger.db")
@@ -114,6 +173,10 @@ if __name__ == "__main__":
         block_height = max_block_height(config['DB_PATH'] + 'hyper.db')
         block_height = math.floor(block_height / 1000) * 1000
         app_log.info("Max block_height = {}".format(block_height))
+
+        # Delete old snapshots
+        for i in range(3,10):
+            delete_ledger(config['DB_PATH'] + 'ledger-{}.tar.gz'.format(block_height-i*1000))
 
         delete_column(config['DB_PATH'] + 'hyper.db', block_height, 'transactions')
         delete_column(config['DB_PATH'] + 'ledger.db', block_height, 'transactions')
@@ -138,7 +201,8 @@ if __name__ == "__main__":
             tar.add(config['DB_PATH'] + "ledger.db", arcname='ledger.db')
             tar.close()
 
-            app_log.info("Creating ledger.json file")
+            #os.system('cd {}; tar -zcvf {} *.db'.format(config['DB_PATH'],filename))
+
             BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
             sha256 = hashlib.sha256()
 
@@ -149,7 +213,11 @@ if __name__ == "__main__":
                         break
                     sha256.update(data)
 
-            data = {'url': config['url'] + filename, 'filename': filename, 'timestamp': int(time.time()),
-                    'sha256': sha256.hexdigest(), 'block_height': block_height, 'valid': 'unknown'}
+            url = config['url'] + filename
+            data = {'url': url, 'filename': filename, 'timestamp': int(time.time()), 'sha256': sha256.hexdigest(), 'block_height': block_height}
             with open(config['DB_PATH'] + 'ledger.json', 'w') as outfile:
                 json.dump(data, outfile)
+
+            app_log.info(json.dumps(data))
+            url="https://hypernodes.bismuth.live/snapshot_reg.php?url={}&timestamp={}&sha256={}&block_height={}".format(data['url'],data['timestamp'],data['sha256'],data['block_height'])
+            r = requests.get(url)
