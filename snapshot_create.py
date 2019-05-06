@@ -97,7 +97,8 @@ def dev_reward(ledger_cursor, block_height, block_timestamp_str, mining_reward, 
                              (-block_height, block_timestamp_str, "Development Reward", "4edadac9093d9326ee4b17f869b14f1a2534f96f9c5d7b48dc9acaed",
                               str(mining_reward), "0", "0", mirror_hash, "0", "0", "0", "0"))
 
-    ledger_cursor.execute("INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+    if block_height>=800000:
+        ledger_cursor.execute("INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                              (-block_height, block_timestamp_str, "Hypernode Payouts", "3e08b5538a4509d9daa99e01ca5912cda3e98a7f79ca01248c2bde16",
                               "8", "0", "0", mirror_hash, "0", "0", "0", "0"))
 
