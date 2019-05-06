@@ -11,7 +11,7 @@ from Cryptodome.Hash import SHA
 
 STEP = 10000 #Print steps
 DB_START = 900000
-DB_HASH = "cec9b091d8fec7e6208947d17d9b5beaa308e170b9868be52186218f"
+DB_HASH = "56ae3832f1c0b21a72b655e8c958de1521e825031b1c3f89c0a07f0e"
 
 def check_dupes(db):
     with sqlite3.connect(db) as ledger_check:
@@ -248,7 +248,7 @@ if __name__ == '__main__':
     print("---> Verifying block hashes")
     db_hash = hash_blocks_until('static/ledger.db',DB_START)
     if db_hash != DB_HASH:
-        print('---> Incorrect db hash')
+        print('---> Incorrect db hash: {}'.format(db_hash))
     else:
         print('Correct db hash')
         verify_blocks('static/ledger.db',DB_START)
