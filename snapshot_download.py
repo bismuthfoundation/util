@@ -11,7 +11,7 @@ from Cryptodome.Hash import SHA
 
 STEP = 10000 #Print steps
 DB_START = 900000
-DB_HASH = "cec9b091d8fec7e6208947d17d9b5beaa308e170b9868be52186218f"
+DB_HASH = "20c5c06c60e50d18c3ac50ff545662fd4fea885084691bbf7e8f9cce"
 
 def check_dupes(db):
     with sqlite3.connect(db) as ledger_check:
