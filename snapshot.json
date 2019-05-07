@@ -1,1 +1,1 @@
-{"DB_PATH": "/root/db/", "url": "https://snapshots.s3.nl-ams.scw.cloud/", "bucket": "s3://snapshots"}
+{"DB_PATH": "/root/db/", "url": "https://snapshots.s3.nl-ams.scw.cloud/", "bucket": "s3://snapshots", "testnet": "False"}
