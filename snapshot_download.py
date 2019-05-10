@@ -4,7 +4,7 @@ Run the script inside the main Bismuth folder ~/Bismuth
 node.py must be stopped when running the script
 """
 
-import sqlite3,base64,hashlib,time,json,requests,tarfile
+import sqlite3,base64,hashlib,time,json,requests,tarfile,glob
 from quantizer import *
 from mining_heavy3 import *
 from Cryptodome.Hash import SHA
@@ -12,6 +12,13 @@ from Cryptodome.Hash import SHA
 STEP = 10000 #Print steps
 DB_START = 900000
 DB_HASH = "20c5c06c60e50d18c3ac50ff545662fd4fea885084691bbf7e8f9cce"
+
+def purge(fileList):
+    for filePath in fileList:
+        try:
+            os.remove(filePath)
+        except:
+            print("Error while deleting file : ", filePath)
 
 def check_dupes(db):
     with sqlite3.connect(db) as ledger_check:
@@ -258,7 +265,7 @@ if __name__ == '__main__':
 
     if 0 <= j <len(data):
         ledger = 'static/ledger.tar.gz'
-        download_file(data[j]['url'],ledger)
+        #download_file(data[j]['url'],ledger)
 
         print("---> Checking file hash (sha256)")
         file_hash = sha256_file(ledger)
@@ -266,6 +273,9 @@ if __name__ == '__main__':
             print('---> Incorrect file hash')
         else:
             print("---> Correct file hash")
+            print("---> Removing *.db-shm and *.db-wal")
+            purge(glob.glob('static/*.db-shm'))
+            purge(glob.glob('static/*.db-wal'))
             print("---> Extracting tar file")
             with tarfile.open(ledger) as tar:
                 tar.extractall("static/")
