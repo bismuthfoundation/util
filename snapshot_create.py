@@ -103,10 +103,11 @@ def dev_reward(ledger_cursor, block_height, block_timestamp_str, mining_reward, 
                               "8", "0", "0", mirror_hash, "0", "0", "0", "0"))
 
 # Written by bizzzy
-def redo_mirror_blocks():
-    conn = sqlite3.connect('static/ledger.db')
+def redo_mirror_blocks(ledgerfile):
+    conn = sqlite3.connect('static/' + ledgerfile)
     conn.text_factory = str
     c = conn.cursor()
+    print(ledgerfile)
     c.execute("SELECT max(block_height) from transactions;")
     max_height = c.fetchone()[0]
 
@@ -143,13 +144,24 @@ if __name__ == "__main__":
     with open('snapshot.json') as json_data:
         config = json.load(json_data)
 
+    port = 5658
+    ledgerfile = "ledger.db"
+    indexfile = "index.db"
+    tgzfile = 'ledger'
+
+    if config['testnet'] == "True":
+        port = 2829
+        ledgerfile = "test.db"
+        indexfile = "index_test.db"
+        tgzfile = 'testledger'
+
     s = socks.socksocket()
     s.settimeout(10)
 
     try:
         i = 0
         while True and i < 100:
-            s.connect(("127.0.0.1", 5658))
+            s.connect(("127.0.0.1", port))
             connections.send(s, "stop")
             time.sleep(2)
             s.close()
@@ -160,49 +172,55 @@ if __name__ == "__main__":
         app_log.info("Node Stopped\n")
 
     if i<100:
-        time.sleep(60)
+        time.sleep(6)
 
-        app_log.info("Redoing mirror blocks")
-        redo_mirror_blocks()
+        if config['testnet'] != "True":
+            app_log.info("Redoing mirror blocks")
+            redo_mirror_blocks(ledgerfile)
+            copyfile("static/hyper.db", config['DB_PATH']+"hyper.db")
 
-        copyfile("static/index.db", config['DB_PATH']+"index.db")
-        copyfile("static/hyper.db", config['DB_PATH']+"hyper.db")
-        copyfile("static/ledger.db", config['DB_PATH']+"ledger.db")
+        copyfile("static/" + indexfile, config['DB_PATH']+indexfile)
+        copyfile("static/" + ledgerfile, config['DB_PATH']+ledgerfile)
+        block_height = max_block_height(config['DB_PATH'] + ledgerfile)
         app_log.info("Restarting Node")
         os.system("screen -d -mS node python3 node.py")
 
-        block_height = max_block_height(config['DB_PATH'] + 'hyper.db')
         block_height = math.floor(block_height / 1000) * 1000
         app_log.info("Max block_height = {}".format(block_height))
 
         # Delete old snapshots
         for i in range(3,10):
-            delete_ledger(config['DB_PATH'] + 'ledger-{}.tar.gz'.format(block_height-i*1000))
+            delete_ledger(config['DB_PATH'] + tgzfile + '-{}.tar.gz'.format(block_height-i*1000))
 
-        delete_column(config['DB_PATH'] + 'hyper.db', block_height, 'transactions')
-        delete_column(config['DB_PATH'] + 'ledger.db', block_height, 'transactions')
-        delete_column(config['DB_PATH'] + 'ledger.db', block_height, 'misc')
-        delete_column(config['DB_PATH'] + 'index.db', block_height, 'aliases')
-        delete_column(config['DB_PATH'] + 'index.db', block_height, 'tokens')
+        delete_column(config['DB_PATH'] + ledgerfile, block_height, 'transactions')
+        delete_column(config['DB_PATH'] + ledgerfile, block_height, 'misc')
+        delete_column(config['DB_PATH'] + indexfile, block_height, 'aliases')
+        delete_column(config['DB_PATH'] + indexfile, block_height, 'tokens')
 
-        bok = check_integrity(config['DB_PATH'] + 'hyper.db', config['DB_PATH'] + 'ledger.db')
+        if config['testnet'] == "True":
+            bok = True
+        else:
+            delete_column(config['DB_PATH'] + 'hyper.db', block_height, 'transactions')
+            bok = check_integrity(config['DB_PATH'] + 'hyper.db', config['DB_PATH'] + 'ledger.db')
+
         app_log.info("Integrity = {}".format(bok))
 
         if bok == True:
             app_log.info("Performing vacuum on dbs")
-            vacuum(config['DB_PATH'] + 'index.db')
-            vacuum(config['DB_PATH'] + 'hyper.db')
-            vacuum(config['DB_PATH'] + 'ledger.db')
 
+            if config['testnet'] != "True":
+                vacuum(config['DB_PATH'] + 'hyper.db')
+
+            vacuum(config['DB_PATH'] + indexfile)
+            vacuum(config['DB_PATH'] + ledgerfile)
             app_log.info("Creating tar.gz file")
-            filename = 'ledger-{}.tar.gz'.format(block_height)
+            filename = tgzfile + '-{}.tar.gz'.format(block_height)
             tar = tarfile.open(config['DB_PATH'] + filename, "w:gz")
-            tar.add(config['DB_PATH'] + "index.db", arcname='index.db')
-            tar.add(config['DB_PATH'] + "hyper.db", arcname='hyper.db')
-            tar.add(config['DB_PATH'] + "ledger.db", arcname='ledger.db')
+            tar.add(config['DB_PATH'] + indexfile, arcname=indexfile)
+            tar.add(config['DB_PATH'] + ledgerfile, arcname=ledgerfile)
+            if config['testnet'] != "True":
+                tar.add(config['DB_PATH'] + "hyper.db", arcname='hyper.db')
             tar.close()
-
-            #os.system('cd {}; tar -zcvf {} *.db'.format(config['DB_PATH'],filename))
 
             BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
             sha256 = hashlib.sha256()
@@ -218,7 +236,3 @@ if __name__ == "__main__":
             data = {'url': url, 'filename': filename, 'timestamp': int(time.time()), 'sha256': sha256.hexdigest(), 'block_height': block_height}
             with open(config['DB_PATH'] + 'ledger.json', 'w') as outfile:
                 json.dump(data, outfile)
-
-            app_log.info(json.dumps(data))
-            url="https://hypernodes.bismuth.live/snapshot_reg.php?url={}&timestamp={}&sha256={}&block_height={}".format(data['url'],data['timestamp'],data['sha256'],data['block_height'])
-            r = requests.get(url)
