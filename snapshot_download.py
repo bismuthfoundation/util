@@ -265,7 +265,7 @@ if __name__ == '__main__':
 
     if 0 <= j <len(data):
         ledger = 'static/ledger.tar.gz'
-        #download_file(data[j]['url'],ledger)
+        download_file(data[j]['url'],ledger)
 
         print("---> Checking file hash (sha256)")
         file_hash = sha256_file(ledger)
