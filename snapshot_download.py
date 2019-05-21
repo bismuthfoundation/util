@@ -9,6 +9,7 @@ from quantizer import *
 from mining_heavy3 import *
 from Cryptodome.Hash import SHA
 
+POW_FORK = 854660
 STEP = 10000 #Print steps
 DB_START = 900000
 DB_HASH = "20c5c06c60e50d18c3ac50ff545662fd4fea885084691bbf7e8f9cce"
