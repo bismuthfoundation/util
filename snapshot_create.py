@@ -123,12 +123,12 @@ def redo_mirror_blocks(ledgerfile):
 
             if block_height < 800000:
                 mining_reward = 15 - (quantize_eight(block_height) / quantize_eight(1000000))
-            elif block_height < 10000000:
+            elif block_height <= 1200000:
                 mining_reward = 15 - (quantize_eight(block_height) / quantize_eight(1000000 / 2)) - Decimal("0.8")
+            else:
+                mining_reward = 15 - (quantize_eight(block_height) / quantize_eight(1000000 / 2)) - Decimal("2.4")
                 if mining_reward < 0:
                     mining_reward = 0
-            else:
-                mining_reward = 0
 
             if block_height % 100000 == 0:
                 print(block_height, timestamp, mining_reward)
