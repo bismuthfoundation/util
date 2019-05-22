@@ -330,7 +330,8 @@ def verify_rewards(app_log, db):
 
     dev_acc = "4edadac9093d9326ee4b17f869b14f1a2534f96f9c5d7b48dc9acaed"
     hn_acc = "3e08b5538a4509d9daa99e01ca5912cda3e98a7f79ca01248c2bde16"
-    rew_fork = 800000
+    rew_fork1 = 800000
+    rew_fork2 = 1200000
 
     try:
         app_log.info("Verification of rewards started...")
@@ -342,15 +343,22 @@ def verify_rewards(app_log, db):
             db_recipient = row[3]
             db_amount = row[4]
 
-            if db_block_height > - rew_fork:
+            if db_block_height > - rew_fork1:
                 rew_calc = 15 + db_block_height/1e6
                 recipient = dev_acc
-            else:
+            elif db_block_height >= - rew_fork2:
                 if db_recipient == dev_acc:
                     rew_calc = 15 - 0.8 + db_block_height/5e5
                     recipient = dev_acc
                 else:
                     rew_calc = 8.0
+                    recipient = hn_acc
+            else:
+                if db_recipient == dev_acc:
+                    rew_calc = 15 - 2.4 + db_block_height/5e5
+                    recipient = dev_acc
+                else:
+                    rew_calc = 24.0
                     recipient = hn_acc
 
             rew_difference = quantize_eight(db_amount - rew_calc)
