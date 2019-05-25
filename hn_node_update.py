@@ -79,7 +79,7 @@ if __name__ == '__main__':
             download_file(url,"bismuth-latest.tar.gz",1e3)
 
             print("---> Stopping all screens and temporarily removing cron jobs")
-            os.system("crontab -r")
+            os.system("crontab -l > my_cron_backup.txt; crontab -r")
             os.system("killall screen")
 
             if keep == "y":
@@ -129,11 +129,11 @@ if __name__ == '__main__':
             time.sleep(60)
 
             print("---> Restoring hypernode sentinel cron jobs. No need to start the hypernode manually.")
-            cmd = 'echo "* * * * * cd {};python3 cron1.py\n*/5 * * * * cd {};python3 cron5.py" | crontab'.format(path2[0],path2[0])
+            cmd = "crontab my_cron_backup.txt"
             os.system(cmd)
 
             print("---> Cleaning up")
-            cmd="rm bismuth-latest.tar.gz; rm ledger-verified.tar.gz"
+            cmd="rm bismuth-latest.tar.gz; rm ledger-verified.tar.gz; rm my_cron_backup.txt"
             os.system(cmd)
 
     elif (L1 == 0) or (L2 == 0):
