@@ -1,9 +1,8 @@
 """
-Hypernode / Bismuth node update script. The script can be run in any directory.
+Bismuth node update script. The script can be run in any directory.
 """
 
 import os
-import time
 import glob
 import tarfile
 import requests
@@ -26,7 +25,6 @@ def download_file(url, filename, logsize):
     try:
         r = requests.get(url, stream=True)
         total_size = int(r.headers.get("content-length")) / 1024
-
         with open(filename, "wb") as filename:
             chunkno = 0
             for chunk in r.iter_content(chunk_size=1024):
@@ -42,7 +40,6 @@ def download_file(url, filename, logsize):
                     filename.write(chunk)
                     filename.flush()
             print("Downloaded 100 %")
-
         return filename
     except:
         raise
@@ -83,19 +80,13 @@ if __name__ == "__main__":
             "https://github.com/bismuthfoundation/Bismuth/releases"
         )
         print("The latest release version is: " + url)
-        answer = input("Do you want to update to this version (y/n): ")
-        if answer == "y":
-            keep = input("Do you want to keep your existing config.txt (y/n): ")
+        answer = input("A/ Do you want to update to this version (y/n): ")
+        if answer.lower() == "y":
             download_file(url, "bismuth-latest.tar.gz", 1e3)
 
-            print("---> Stopping all screens and temporarily removing cron jobs")
-            os.system("crontab -r")
-            os.system("killall screen")
-
-            if keep == "y":
-                print("---> Keeping existing config.txt")
-                cmd = "cp {}/config.txt {}/config-keep.txt".format(path1[0], path1[0])
-                os.system(cmd)
+            print("---> Copying existing config.txt to config-keep.txt")
+            cmd = "cp {}/config.txt {}/config-keep.txt".format(path1[0], path1[0])
+            os.system(cmd)
 
             print("---> Extracting bismuth-latest.tar.gz file")
             with tarfile.open("bismuth-latest.tar.gz") as tar:
@@ -109,64 +100,61 @@ if __name__ == "__main__":
                 )
                 os.system(cmd)
 
-            if keep == "y":
-                print("---> Keeping existing config.txt")
-                cmd = "cp {}/config-keep.txt {}/config.txt; rm {}/config-keep.txt".format(
-                    path1[0], path1[0], path1[0]
+            keep = input("B/ Do you want to keep previous config.txt - Answer no unless you know what you're doing (y/n): ")
+            if keep.lower() == "y":
+                print("---> Restauring existing config.txt, creating config-dist.txt")
+                cmd = "cp {}/config.txt {}/config-dist.txt;cp {}/config-keep.txt {}/config.txt; rm {}/config-keep.txt".format(
+                    path1[0], path1[0], path1[0], path1[0], path1[0]
                 )
                 os.system(cmd)
 
             if not os.path.isfile(
                 "{}/config_custom.txt"
             ):  # Create an empty config_custom.txt if not exists
+                print(
+                    "---> Creating {}/config_custom.txt, use that file for your custom settings".format(
+                        path1[0]
+                    )
+                )
                 file = open("{}/config_custom.txt".format(path1[0]), "w")
                 file.close()
 
-            print("---> Downloading verified ledger")
-            download_file(
-                "https://snapshots.s3.nl-ams.scw.cloud/ledger-verified.tar.gz",
-                "ledger-verified.tar.gz",
-                1e5,
-            )
+            snap = input("C/ Do you want to download a full recent snapshot (y/n): ")
+            if snap.lower() == "y":
+                print("---> Downloading verified ledger")
+                download_file(
+                    "https://snapshots.s3.nl-ams.scw.cloud/ledger-verified.tar.gz",
+                    "ledger-verified.tar.gz",
+                    1e5,
+                )
+                print("---> Removing old ledger files")
+                purge(glob.glob(path1[0] + "/static/*.db-shm"))
+                purge(glob.glob(path1[0] + "/static/*.db-wal"))
+                purge(glob.glob(path1[0] + "/static/ledger*"))
+                purge(glob.glob(path1[0] + "/static/hyper*"))
+                purge(glob.glob(path1[0] + "/static/*.db"))
 
-            print("---> Removing old ledger files")
-            purge(glob.glob(path1[0] + "/static/*.db-shm"))
-            purge(glob.glob(path1[0] + "/static/*.db-wal"))
-            purge(glob.glob(path1[0] + "/static/ledger*"))
-            purge(glob.glob(path1[0] + "/static/hyper*"))
-            purge(glob.glob(path1[0] + "/static/*.db"))
-
-            print("---> Extracting ledger-verified.tar.gz file")
-            with tarfile.open("ledger-verified.tar.gz") as tar:
-                tar.extractall(path1[0] + "/static/")
-
-            print(
-                "---> Installing node requirements and starting node.py in screen job"
-            )
-            cmd = "cd {}; pip3 install -r requirements-node.txt; screen -d -mS node python3 node.py".format(
-                path1[0]
-            )
-            print(cmd)
-            os.system(cmd)
-
-            print("---> Waiting 60 seconds before starting hypernode sentinels")
-            time.sleep(60)
-
-            print(
-                "---> Restoring hypernode sentinel cron jobs. No need to start the hypernode manually."
-            )
-            cmd = 'echo "* * * * * cd {};python3 cron1.py\n*/5 * * * * cd {};python3 cron5.py" | crontab'.format(
-                path2[0], path2[0]
-            )
-            os.system(cmd)
+                print("---> Extracting ledger-verified.tar.gz file")
+                with tarfile.open("ledger-verified.tar.gz") as tar:
+                    tar.extractall(path1[0] + "/static/")
 
             print("---> Cleaning up")
             cmd = "rm bismuth-latest.tar.gz; rm ledger-verified.tar.gz"
             os.system(cmd)
 
-    elif (L1 == 0) or (L2 == 0):
+        print("---> Installing node requirements")
+        cmd = "cd {}; pip3 install -r requirements-node.txt".format(path1[0])
+        print(cmd)
+        os.system(cmd)
+
+    elif L1 == 0:
         print(
-            "node.py or cron5.py not found. Use auto-install script instead: https://github.com/bismuthfoundation/hypernode"
+            "node.py not found. Use auto-install script instead: "
+            "https://github.com/bismuthfoundation/hypernode/tree/master/auto-install"
+        )
+    elif L2 == 0:
+        print(
+            "cron5.py not found. Use auto-install script instead: https://github.com/bismuthfoundation/hypernode"
         )
     else:
         print("More than one node.py or cron5.py found, exiting.")
