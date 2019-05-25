@@ -1,5 +1,8 @@
 """
 Bismuth node update script. The script can be run in any directory.
+
+curl https://github.com/bismuthfoundation/util/raw/dev/node_updater.py|python3
+
 """
 
 import os
