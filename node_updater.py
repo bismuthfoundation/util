@@ -5,9 +5,11 @@ curl https://raw.githubusercontent.com/bismuthfoundation/util/dev/node_updater.p
 
 """
 
-import os
 import glob
+import os
 import tarfile
+from sys import exit
+
 import requests
 
 
@@ -66,7 +68,22 @@ def purge(fileList):
             print("Error while deleting file : ", filePath)
 
 
+def is_running(process_name: str) -> bool:
+    cmd = "ps aux|grep -v 'grep'|grep '{}'".format(process_name)
+    res = os.popen(cmd).read()
+    return process_name in res
+
+
 if __name__ == "__main__":
+    if is_running("node.py"):
+        print("---> A node is running, please stop it to avoid data corruption")
+        exit()
+    if is_running("hn_instance.py"):
+        print("---> A Hypernode is running, please stop it to avoid data corruption")
+        exit()
+    print(
+        "Make sure you deactivated any cron that would restart node or hypernode while upgrading. Ctrl-c and check if necessary."
+    )
     print("---> Searching for commands.py and cron5.py")
     home = os.path.expanduser("~")
     path1 = find_all("commands.py", home)
@@ -103,7 +120,9 @@ if __name__ == "__main__":
                 )
                 os.system(cmd)
 
-            keep = input("B/ Do you want to keep previous config.txt - Answer no unless you know what you're doing (y/n): ")
+            keep = input(
+                "B/ Do you want to keep previous config.txt - Answer no unless you know what you're doing (y/n): "
+            )
             if keep.lower() == "y":
                 print("---> Restauring existing config.txt, creating config-dist.txt")
                 cmd = "cp {}/config.txt {}/config-dist.txt;cp {}/config-keep.txt {}/config.txt; rm {}/config-keep.txt".format(
