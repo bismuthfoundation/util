@@ -47,8 +47,8 @@ def get_github_latest_release(url):
     index_beg = index
     while r.text[index_beg] != '"': #href separator
        index_beg = index_beg - 1
-    path = "https://github.com" + r.text[index_beg+1:index+6]
-    return "{}".format(path)
+    path = "https://github.com" + "{}".format(r.text[index_beg+1:index+6])
+    return path
 
 def purge(fileList):
     for filePath in fileList:
