@@ -75,7 +75,7 @@ if __name__ == '__main__':
         print("The latest release version is: " + url)
         answer = input("Do you want to update to this version (y/n): ")
         if answer == "y":
-            keep = input("Do you want to keep your existing config.txt (y/n): ")
+            keep = input("Do you want to keep your existing config.txt (y/n). If not sure, answer n: ")
             download_file(url,"bismuth-latest.tar.gz",1e3)
 
             print("---> Stopping all screens and temporarily removing cron jobs")
