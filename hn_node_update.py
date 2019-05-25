@@ -15,7 +15,7 @@ def find_all(name, path):
             result.append(os.path.join(root))
     return result
 
-def download_file(url, filename,logsize):
+def download_file(url, filename, logsize):
     """From node.py: Download a file from URL to filename
     :param url: URL to download file from
     :param filename: Filename to save downloaded data as
@@ -122,7 +122,6 @@ if __name__ == '__main__':
 
             print("---> Installing node requirements and starting node.py in screen job")
             cmd = "cd {}; pip3 install -r requirements-node.txt; screen -d -mS node python3 node.py".format(path1[0])
-            print(cmd)
             os.system(cmd)
 
             print("---> Waiting 60 seconds before starting hypernode sentinels")
@@ -137,8 +136,8 @@ if __name__ == '__main__':
             os.system(cmd)
 
     elif (L1 == 0) or (L2 == 0):
-        print("node.py or cron5.py not found. Use auto-install script instead: https://github.com/bismuthfoundation/hypernode")
+        print("commands.py or cron5.py not found. Use auto-install script instead: https://github.com/bismuthfoundation/hypernode")
     else:
-        print("More than one node.py or cron5.py found, exiting.")
+        print("More than one commands.py or cron5.py found, exiting.")
         print(path1)
         print(path2)
