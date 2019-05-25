@@ -1,7 +1,7 @@
 """
 Bismuth node update script. The script can be run in any directory.
 
-curl https://github.com/bismuthfoundation/util/raw/dev/node_updater.py|python3
+curl https://raw.githubusercontent.com/bismuthfoundation/util/dev/node_updater.py|python3
 
 """
 
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     L1 = len(path1)
     L2 = len(path2)
 
-    if (L1 == 1) and (L2 == 1):
+    if (L1 == 1) and (L2 <= 1):
         print("commands.py found at: {}".format(path1))
         print("cron5.py found at: {}".format(path2))
 
@@ -155,11 +155,11 @@ if __name__ == "__main__":
             "node.py not found. Use auto-install script instead: "
             "https://github.com/bismuthfoundation/hypernode/tree/master/auto-install"
         )
-    elif L2 == 0:
-        print(
-            "cron5.py not found. Use auto-install script instead: https://github.com/bismuthfoundation/hypernode"
-        )
     else:
         print("More than one node.py or cron5.py found, exiting.")
         print(path1)
         print(path2)
+    if L2 == 0:
+        print(
+            "cron5.py not found. Use auto-install script instead: https://github.com/bismuthfoundation/hypernode"
+        )
