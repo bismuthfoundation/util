@@ -19,12 +19,22 @@ def download_file(url, filename, logsize):
     """From node.py: Download a file from URL to filename
     :param url: URL to download file from
     :param filename: Filename to save downloaded data as
+    :param logsize: Download status display frequency
     returns `filename`
     """
-    try:
-        r = requests.get(url, stream=True)
-        total_size = int(r.headers.get('content-length')) / 1024
 
+    bOK = False
+    while not bOK:
+        try:
+            r = requests.get(url, stream=True)
+            total_size = int(r.headers.get('content-length')) / 1024
+            bOK = True
+        except:
+            print("---> Contacting https://github.com again")
+            bOK = False
+            time.sleep(10)
+
+    try:
         with open(filename, 'wb') as filename:
             chunkno = 0
             for chunk in r.iter_content(chunk_size=1024):
