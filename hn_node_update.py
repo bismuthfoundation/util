@@ -134,7 +134,7 @@ if __name__ == '__main__':
             cmd = "cd {}; pip3 install -r requirements-node.txt; screen -d -mS node python3 node.py".format(path1[0])
             os.system(cmd)
 
-            print("---> Waiting 60 seconds before starting hypernode sentinels")
+            print("---> Waiting 60 seconds before restoring cron jobs")
             time.sleep(60)
 
             print("---> Restoring hypernode sentinel cron jobs. No need to start the hypernode manually.")
