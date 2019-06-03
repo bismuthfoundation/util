@@ -30,6 +30,7 @@ from decimal import *
 from quantizer import *
 from shutil import copyfile
 
+POW_FORK = 854660
 
 def delete_ledger(filename):
     try:
