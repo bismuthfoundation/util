@@ -16,6 +16,7 @@ from Cryptodome.Hash import SHA
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Signature import PKCS1_v1_5
 
+POW_FORK = 854660
 
 def verify_txs(app_log, db, full_ledger):
     with sqlite3.connect(db) as ledger_check:
