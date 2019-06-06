@@ -16,7 +16,8 @@ from Cryptodome.Hash import SHA
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Signature import PKCS1_v1_5
 
-POW_FORK = 854660
+POW_FORK = 854600
+HF2 = 1200000
 
 def verify_txs(app_log, db, full_ledger):
     with sqlite3.connect(db) as ledger_check:
@@ -331,8 +332,7 @@ def verify_rewards(app_log, db):
 
     dev_acc = "4edadac9093d9326ee4b17f869b14f1a2534f96f9c5d7b48dc9acaed"
     hn_acc = "3e08b5538a4509d9daa99e01ca5912cda3e98a7f79ca01248c2bde16"
-    rew_fork1 = 800000
-    rew_fork2 = 1200000
+    rew_fork = 800000
 
     try:
         app_log.info("Verification of rewards started...")
@@ -344,10 +344,10 @@ def verify_rewards(app_log, db):
             db_recipient = row[3]
             db_amount = row[4]
 
-            if db_block_height > - rew_fork1:
+            if db_block_height > - rew_fork:
                 rew_calc = 15 + db_block_height/1e6
                 recipient = dev_acc
-            elif db_block_height >= - rew_fork2:
+            elif db_block_height >= - HF2:
                 if db_recipient == dev_acc:
                     rew_calc = 15 - 0.8 + db_block_height/5e5
                     recipient = dev_acc
@@ -364,7 +364,7 @@ def verify_rewards(app_log, db):
 
             rew_difference = quantize_eight(db_amount - rew_calc)
             if (rew_difference != 0) or (db_recipient != recipient):
-                app_log.warning("Reward mismatch: {}".format(db_block_height))
+                app_log.warning("Reward mismatch: {} {}".format(db_block_height,rew_difference))
                 invalid = invalid + 1
 
             if -db_block_height > print_step:
@@ -401,3 +401,4 @@ if __name__ == "__main__":
 
     with open(config['DB_PATH'] + 'ledger.json', 'w') as outfile:
         json.dump(data, outfile)
+    
