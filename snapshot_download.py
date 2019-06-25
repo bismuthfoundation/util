@@ -4,7 +4,7 @@ Run the script inside the main Bismuth folder ~/Bismuth
 node.py must be stopped when running the script
 """
 
-import sqlite3,base64,hashlib,time,json,requests,tarfile,glob
+import sqlite3,base64,hashlib,time,json,requests,tarfile,glob,sys
 from quantizer import *
 from mining_heavy3 import *
 from Cryptodome.Hash import SHA
@@ -250,6 +250,12 @@ def download_file(url, filename):
         raise
 
 if __name__ == '__main__':
+    print("Checking sha256 of heavy3a.bin file")
+    hash = sha256_file("heavy3a.bin")
+    if hash != "ffe30d8a63e1731e613b16ff8fd040d2946dba6a09823d7cc09d837570c55199":
+        print("Invalid sha256 of file heavy3a.bin. Delete the file and try again.")
+        sys.exit()
+
     url='https://hypernodes.bismuth.live/snapshots.json'
     resp = requests.get(url=url)
     data = resp.json()
