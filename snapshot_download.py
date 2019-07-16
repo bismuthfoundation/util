@@ -8,6 +8,7 @@ import sqlite3,base64,hashlib,time,json,requests,tarfile,glob,sys
 from quantizer import *
 from mining_heavy3 import *
 from Cryptodome.Hash import SHA
+import os.path
 
 POW_FORK = 854660
 STEP = 10000 #Print steps
@@ -250,6 +251,8 @@ def download_file(url, filename):
         raise
 
 if __name__ == '__main__':
+    if not os.path.isfile("heavy3a.bin"):
+        create_heavy3a()
     print("Checking sha256 of heavy3a.bin file")
     hash = sha256_file("heavy3a.bin")
     if hash != "ffe30d8a63e1731e613b16ff8fd040d2946dba6a09823d7cc09d837570c55199":
