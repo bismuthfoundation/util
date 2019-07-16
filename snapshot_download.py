@@ -9,6 +9,7 @@ from quantizer import *
 from mining_heavy3 import *
 from Cryptodome.Hash import SHA
 import os.path
+import argparse
 
 POW_FORK = 854660
 STEP = 10000 #Print steps
@@ -251,6 +252,12 @@ def download_file(url, filename):
         raise
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Download recent Bismuth ledger.')
+    parser.add_argument('--snapshot', type=int,
+                    help='select snapshot url number (1 or 2)')
+
+    args = parser.parse_args()
+
     if not os.path.isfile("heavy3a.bin"):
         create_heavy3a()
     print("Checking sha256 of heavy3a.bin file")
@@ -270,8 +277,12 @@ if __name__ == '__main__':
         print("[{}] Block_height={} url={}".format(i,site['block_height'],site['url']))
         i=i+1
 
-    j=input('Enter your input:')
-    j=int(j)-1
+    if args.snapshot is None:
+        j=input('Enter your input:')
+        j=int(j)-1
+    else:
+        print("Selected snapshot number {} by --snapshot argument".format(args.snapshot))
+        j=args.snapshot-1
 
     if 0 <= j <len(data):
         ledger = 'static/ledger.tar.gz'
