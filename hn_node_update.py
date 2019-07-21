@@ -3,6 +3,7 @@ Hypernode / Bismuth node update script. The script can be run in any directory.
 """
 
 import os
+import sys
 import time
 import glob
 import tarfile
@@ -67,8 +68,27 @@ def purge(fileList):
         except:
             print("Error while deleting file : ", filePath)
 
+def search_and_replace_in_file(filename,search,replace):
+    with open(filename, 'r') as file:
+        filedata = file.read()
+    # Replace the target string
+    filedata = filedata.replace(search, replace)
+    # Write the file out again
+    with open(filename, 'w') as file:
+        file.write(filedata)
 
 if __name__ == '__main__':
+    print("---> Checking for Python 3.7")
+    try:
+        assert sys.version_info >= (3, 7)
+    except:
+        print("This update script requires Python 3.7")
+        print("Before continuing, do the following as root:")
+        print("apt update")
+        print("apt install python3.7-dev")
+        print("After installation, run this script with: python3.7 hn_node_update.py")
+        sys.exit()
+
     print("---> Searching for commands.py and cron5.py")
     home = os.path.expanduser("~")
     path1 = find_all('commands.py',home)
@@ -79,6 +99,9 @@ if __name__ == '__main__':
     if (L1 == 1) and (L2 == 1):
         print("commands.py found at: {}".format(path1))
         print("cron5.py found at: {}".format(path2))
+
+        i = path2[0].find('/crontab')
+        hn_path = path2[0][0:i] # Main folder of hypernode
 
         print("---> Getting latest Bismuth node release")
         url = get_github_latest_release("https://github.com/bismuthfoundation/Bismuth/releases")
@@ -116,6 +139,14 @@ if __name__ == '__main__':
                 file = open("{}/config_custom.txt".format(path1[0]), "w")
                 file.close()
 
+            print("Installing/updating plugins")
+            cmd = "cd {}; cd plugins; mkdir 035_socket_client; cd 035_socket_client; rm __init__.py; wget https://github.com/bismuthfoundation/BismuthPlugins/raw/master/plugins/035_socket_client/__init__.py".format(path1[0])
+            os.system(cmd)
+            cmd = "cd {}; cd plugins/500_hypernode; rm __init__.py; wget https://github.com/bismuthfoundation/hypernode/raw/beta99/node_plugin/__init__.py".format(path1[0])
+            os.system(cmd)
+            cmd = "cd {}; rm ledger_queries.py; wget https://github.com/bismuthfoundation/hypernode/raw/beta99/node_plugin/ledger_queries.py".format(path1[0])
+            os.system(cmd)
+
             print("---> Downloading verified ledger")
             download_file("https://snapshots.s3.nl-ams.scw.cloud/ledger-verified.tar.gz","ledger-verified.tar.gz",1e5)
 
@@ -131,18 +162,42 @@ if __name__ == '__main__':
                 tar.extractall(path1[0] + "/static/")
 
             print("---> Installing node requirements and starting node.py in screen job")
-            cmd = "cd {}; pip3 install -r requirements-node.txt; screen -d -mS node python3 node.py".format(path1[0])
+            cmd = "cd {}; rm -rd polysign; python3.7 -m pip install -r requirements-node.txt; python3.7 -m pip install ipwhois; screen -d -mS node python3.7 node.py".format(path1[0])
             os.system(cmd)
+
+            print("---> Updating Hypernode files to beta99")
+            cmd = "cd {}".format(hn_path)
+            url="https://github.com/bismuthfoundation/hypernode/archive/beta99.tar.gz"
+            download_file(url,"hn-latest.tar.gz",1e3)
+            with tarfile.open("hn-latest.tar.gz") as tar:
+                extract_path = "hn_temp"
+                os.mkdir(extract_path)
+                tar.extractall(extract_path)
+                names = tar.getnames()
+                tar_path = names[0]
+                cmd = "cp -r {}/{}/* {}; rm -rf {}".format(extract_path,tar_path,hn_path,extract_path)
+                os.system(cmd)
+
+            print("---> Installing Hypernode requirements")
+            cmd = "cd {}; python3.7 -m pip install -r requirements.txt".format(hn_path)
+            os.system(cmd)
+
+            print("---> Changing 'python3' to 'python3.7' in cron1.py")
+            filename = "{}/cron1.py".format(path2[0])
+            search_and_replace_in_file(filename, "'python3'","'python3.7'")
 
             print("---> Waiting 60 seconds before restoring cron jobs")
             time.sleep(60)
+
+            print("---> Search-and-replace of Python3 to Python3.7")
+            search_and_replace_in_file('my_cron_backup.txt', 'python3 cron','python3.7 cron')
 
             print("---> Restoring hypernode sentinel cron jobs. No need to start the hypernode manually.")
             cmd = "crontab my_cron_backup.txt"
             os.system(cmd)
 
             print("---> Cleaning up")
-            cmd="rm bismuth-latest.tar.gz; rm ledger-verified.tar.gz; rm my_cron_backup.txt"
+            cmd="rm bismuth-latest.tar.gz; rm ledger-verified.tar.gz; rm my_cron_backup.txt; rm hn-latest.tar.gz"
             os.system(cmd)
 
     elif (L1 == 0) or (L2 == 0):
