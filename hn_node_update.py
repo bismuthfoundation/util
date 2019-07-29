@@ -124,7 +124,7 @@ if __name__ == '__main__':
                 cmd = "cp {}/config.txt {}/config-keep.txt".format(path1[0],path1[0])
                 os.system(cmd)
                 
-            if keep == "n"
+            if keep == "n":
                 print("---> Creating backup of existing config.txt")
                 cmd = "cp {}/config.txt {}/config-backup.txt".format(path1[0],path1[0])
                 os.system(cmd)
