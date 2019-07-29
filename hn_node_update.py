@@ -108,7 +108,8 @@ if __name__ == '__main__':
         print("The latest release version is: " + url)
         answer = input("Do you want to update to this version (y/n): ")
         if answer == "y":
-            keep = input("Do you want to keep your existing config.txt (y/n). If not sure, answer n: ")
+            #keep = input("Do you want to keep your existing config.txt (y/n). If not sure, answer n: ")
+            keep = "n"
             download_file(url,"bismuth-latest.tar.gz",1e3)
 
             print("---> Stopping all screens and temporarily removing cron jobs")
@@ -118,6 +119,11 @@ if __name__ == '__main__':
             if keep == "y":
                 print("---> Keeping existing config.txt")
                 cmd = "cp {}/config.txt {}/config-keep.txt".format(path1[0],path1[0])
+                os.system(cmd)
+                
+            if keep == "n"
+                print("---> Creating backup of existing config.txt")
+                cmd = "cp {}/config.txt {}/config-backup.txt".format(path1[0],path1[0])
                 os.system(cmd)
 
             print("---> Extracting bismuth-latest.tar.gz file")
@@ -186,6 +192,10 @@ if __name__ == '__main__':
             filename = "{}/cron1.py".format(path2[0])
             search_and_replace_in_file(filename, "'python3'","'python3.7'")
 
+            print("---> Changing 'python3' to 'python3.7' in sentinel.py")
+            filename = "{}/sentinel/sentinel.py".format(hn_path)
+            search_and_replace_in_file(filename, "'python3'","'python3.7'")
+            
             print("---> Deleting existing poschain to enable bootstrap")
             cmd = "cd {}/main/data; rm *".format(hn_path)
             os.system(cmd)
@@ -194,7 +204,7 @@ if __name__ == '__main__':
             time.sleep(60)
 
             print("---> Search-and-replace of Python3 to Python3.7")
-            search_and_replace_in_file('my_cron_backup.txt', 'python3 cron','python3.7 cron')
+            search_and_replace_in_file('my_cron_backup.txt', 'python3 ','python3.7 ')
 
             print("---> Restoring hypernode sentinel cron jobs. No need to start the hypernode manually.")
             cmd = "crontab my_cron_backup.txt"
