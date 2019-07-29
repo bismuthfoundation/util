@@ -69,14 +69,17 @@ def purge(fileList):
             print("Error while deleting file : ", filePath)
 
 def search_and_replace_in_file(filename,search,replace):
-    with open(filename, 'r') as file:
-        filedata = file.read()
-    # Replace the target string
-    filedata = filedata.replace(search, replace)
-    # Write the file out again
-    with open(filename, 'w') as file:
-        file.write(filedata)
-
+    try:
+        with open(filename, 'r') as file:
+            filedata = file.read()
+        # Replace the target string
+        filedata = filedata.replace(search, replace)
+        # Write the file out again
+        with open(filename, 'w') as file:
+            file.write(filedata)
+    except:
+        print("File {} does not exist".format(filename))
+            
 if __name__ == '__main__':
     print("---> Checking for Python 3.7")
     try:
@@ -195,7 +198,11 @@ if __name__ == '__main__':
             print("---> Changing 'python3' to 'python3.7' in sentinel.py")
             filename = "{}/sentinel/sentinel.py".format(hn_path)
             search_and_replace_in_file(filename, "'python3'","'python3.7'")
-            
+
+            print("---> Changing 'python3' to 'python3.7' in old sentinel if it exists")
+            filename = "{}/node_sentinel.py".format(path1[0])
+            search_and_replace_in_file(filename, "'python3'","'python3.7'")
+
             print("---> Deleting existing poschain to enable bootstrap")
             cmd = "cd {}/main/data; rm *".format(hn_path)
             os.system(cmd)
