@@ -157,7 +157,7 @@ if __name__ == '__main__':
             os.system(cmd)
 
             print("---> Downloading verified ledger")
-            download_file("https://snapshots.s3.nl-ams.scw.cloud/ledger-verified.tar.gz","ledger-verified.tar.gz",1e5)
+            download_file("http://212.47.253.89/ledger-verified.tar.gz","ledger-verified.tar.gz",1e5)
 
             print("---> Removing old ledger files")
             purge(glob.glob(path1[0] + '/static/*.db-shm'))
