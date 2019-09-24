@@ -212,7 +212,7 @@ if __name__ == '__main__':
             search_and_replace_in_file(filename, "'python3'","'python3.7'")
 
             print("---> Deleting existing poschain to enable bootstrap")
-            cmd = "cd {}/main/data; rm *".format(hn_path)
+            cmd = "cd {}/main/data; rm hndb*; rm poc*".format(hn_path)
             os.system(cmd)
 
             print("---> Waiting 60 seconds before restoring cron jobs")
