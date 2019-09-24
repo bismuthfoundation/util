@@ -79,7 +79,7 @@ def search_and_replace_in_file(filename,search,replace):
             file.write(filedata)
     except:
         print("File {} does not exist".format(filename))
-            
+
 if __name__ == '__main__':
     print("---> Checking for Python 3.7")
     try:
@@ -88,8 +88,16 @@ if __name__ == '__main__':
         print("This update script requires Python 3.7")
         print("Before continuing, do the following as root:")
         print("apt update")
-        print("apt install python3.7-dev")
+        print("apt install python3.7-dev libmp3-dev python3-pip")
         print("After installation, run this script with: python3.7 hn_node_update.py")
+        sys.exit()
+
+    print("----------")
+    print("apt update")
+    print("apt install python3.7-dev libmp3-dev python3-pip")
+    print("----------")
+    answer = input("Did you run the above commands as root (y/n): ")
+    if answer is not "y":
         sys.exit()
 
     print("---> Searching for commands.py and cron5.py")
@@ -123,7 +131,7 @@ if __name__ == '__main__':
                 print("---> Keeping existing config.txt")
                 cmd = "cp {}/config.txt {}/config-keep.txt".format(path1[0],path1[0])
                 os.system(cmd)
-                
+
             if keep == "n":
                 print("---> Creating backup of existing config.txt")
                 cmd = "cp {}/config.txt {}/config-backup.txt".format(path1[0],path1[0])
@@ -171,7 +179,7 @@ if __name__ == '__main__':
                 tar.extractall(path1[0] + "/static/")
 
             print("---> Installing node requirements and starting node.py in screen job")
-            cmd = "cd {}; rm -rd polysign; python3.7 -m pip install -r requirements-node.txt; python3.7 -m pip install ipwhois; screen -d -mS node python3.7 node.py".format(path1[0])
+            cmd = "cd {}; rm -rd polysign; python3.7 -m pip install -r requirements-node.txt; python3.7 -m pip install ipwhois fastecdsa; screen -d -mS node python3.7 node.py".format(path1[0])
             os.system(cmd)
 
             print("---> Updating Hypernode files to beta99")
