@@ -88,13 +88,13 @@ if __name__ == '__main__':
         print("This update script requires Python 3.7")
         print("Before continuing, do the following as root:")
         print("apt update")
-        print("apt install python3.7-dev libmp3-dev python3-pip")
+        print("apt install python3.7-dev libgmp3-dev python3-pip")
         print("After installation, run this script with: python3.7 hn_node_update.py")
         sys.exit()
 
     print("----------")
     print("apt update")
-    print("apt install python3.7-dev libmp3-dev python3-pip")
+    print("apt install python3.7-dev libgmp3-dev python3-pip")
     print("----------")
     answer = input("Did you run the above commands as root (y/n): ")
     if answer is not "y":
