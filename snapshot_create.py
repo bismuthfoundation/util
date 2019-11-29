@@ -97,7 +97,8 @@ def dev_reward(ledger_cursor, block_height, block_timestamp_str, mining_reward, 
                              (-block_height, block_timestamp_str, "Development Reward", "4edadac9093d9326ee4b17f869b14f1a2534f96f9c5d7b48dc9acaed",
                               str(mining_reward), "0", "0", mirror_hash, "0", "0", "0", "0"))
 
-    ledger_cursor.execute("INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+    if hn_reward > 0:
+        ledger_cursor.execute("INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                              (-block_height, block_timestamp_str, "Hypernode Payouts", "3e08b5538a4509d9daa99e01ca5912cda3e98a7f79ca01248c2bde16",
                               str(hn_reward), "0", "0", mirror_hash, "0", "0", "0", "0"))
 
@@ -126,7 +127,7 @@ def redo_mirror_blocks(ledgerfile):
 
             if block_height < HF:
                 mining_reward = 15 - (quantize_eight(block_height) / quantize_eight(1000000))
-                hn_reward = 0
+                hn_reward = 0.0
             elif block_height <= HF2:
                 mining_reward = 15 - (quantize_eight(block_height) / quantize_eight(1000000 / 2)) - Decimal("0.8")
                 hn_reward = 8.0
@@ -137,9 +138,11 @@ def redo_mirror_blocks(ledgerfile):
                 mining_reward = 9.7
                 if block_height>HF3:
                     mining_reward = quantize_eight(5.5 -(block_height-HF3)/1.1e6)
-                hn_reward = quantize_eight(24.0 - (block_height-HF3)/3.0e6)
-                if mining_reward < 0:
-                    mining_reward = 0
+                hn_reward = 10.0*(2.4 - (block_height-HF3+5)/3.0e6)
+                if mining_reward < 0.5:
+                    mining_reward = 0.5
+                if hn_reward < 0.5:
+                    hn_reward = 0.5
 
             if block_height % 100000 == 0:
                 print(block_height, timestamp, mining_reward)
