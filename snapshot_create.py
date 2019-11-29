@@ -1,3 +1,15 @@
+"""
+Script for generating a blockchain snapshot (backup)
+Snapshot block_height is rounded down to nearest 1000 block
+Edit the path where the tar.gz file is created in snapshot.json
+Complete script mysnap for snapshot process (between -----):
+-----
+#!/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+cd /root/Bismuth
+python3 snapshot_create.py
+python3 ledger_verify.py
+python3 snapshot_upload.py
 -----
 The script above can be run as a cron entry: 30 19 * * * screen -d -mS mysnap /root/Bismuth/mysnap
 """
