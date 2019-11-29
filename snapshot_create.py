@@ -1,15 +1,3 @@
-"""
-Script for generating a blockchain snapshot (backup)
-Snapshot block_height is rounded down to nearest 1000 block
-Edit the path where the tar.gz file is created in snapshot.json
-Complete script mysnap for snapshot process (between -----):
------
-#!/bin/bash
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-cd /root/Bismuth
-python3 snapshot_create.py
-python3 ledger_verify.py
-python3 snapshot_upload.py
 -----
 The script above can be run as a cron entry: 30 19 * * * screen -d -mS mysnap /root/Bismuth/mysnap
 """
@@ -30,7 +18,6 @@ from decimal import *
 from quantizer import *
 from shutil import copyfile
 
-POW_FORK = 854660
 
 def delete_ledger(filename):
     try:
@@ -93,21 +80,16 @@ def vacuum(db):
         l.execute("vacuum")
         l.close()
 
-def dev_reward(ledger_cursor, block_height, block_timestamp_str, mining_reward, mirror_hash):
+def dev_reward(ledger_cursor, block_height, block_timestamp_str, mining_reward, hn_reward, mirror_hash):
     ledger_cursor.execute("INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                              (-block_height, block_timestamp_str, "Development Reward", "4edadac9093d9326ee4b17f869b14f1a2534f96f9c5d7b48dc9acaed",
                               str(mining_reward), "0", "0", mirror_hash, "0", "0", "0", "0"))
 
-    if block_height>1200000:
-        ledger_cursor.execute("INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+    ledger_cursor.execute("INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                              (-block_height, block_timestamp_str, "Hypernode Payouts", "3e08b5538a4509d9daa99e01ca5912cda3e98a7f79ca01248c2bde16",
-                              "24", "0", "0", mirror_hash, "0", "0", "0", "0"))
-    elif block_height>=800000:
-        ledger_cursor.execute("INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                             (-block_height, block_timestamp_str, "Hypernode Payouts", "3e08b5538a4509d9daa99e01ca5912cda3e98a7f79ca01248c2bde16",
-                              "8", "0", "0", mirror_hash, "0", "0", "0", "0"))
+                              str(hn_reward), "0", "0", mirror_hash, "0", "0", "0", "0"))
 
-# Written by bizzzy
+
 def redo_mirror_blocks(ledgerfile):
     conn = sqlite3.connect('static/' + ledgerfile)
     conn.text_factory = str
@@ -119,6 +101,10 @@ def redo_mirror_blocks(ledgerfile):
     c.execute("DELETE FROM transactions WHERE address = 'Development Reward'")
     c.execute("DELETE FROM transactions WHERE address = 'Hypernode Payouts'")
 
+    HF = 800000
+    HF2 = 1200000
+    HF3 = 1450000
+
     for block_height in range(1,max_height+1):
         if block_height % 10 == 0:
             c.execute("SELECT * FROM transactions WHERE block_height = ? ORDER BY rowid", (block_height,))
@@ -126,19 +112,27 @@ def redo_mirror_blocks(ledgerfile):
             mining_tx = tx_list_to_hash[-1]
             timestamp = mining_tx[1]
 
-            if block_height < 800000:
+            if block_height < HF:
                 mining_reward = 15 - (quantize_eight(block_height) / quantize_eight(1000000))
-            elif block_height <= 1200000:
+                hn_reward = 0
+            elif block_height <= HF2:
                 mining_reward = 15 - (quantize_eight(block_height) / quantize_eight(1000000 / 2)) - Decimal("0.8")
-            else:
+                hn_reward = 8.0
+            elif block_height < HF3:
                 mining_reward = 15 - (quantize_eight(block_height) / quantize_eight(1000000 / 2)) - Decimal("2.4")
+                hn_reward = 24.0
+            else:
+                mining_reward = 9.7
+                if block_height>HF3:
+                    mining_reward = quantize_eight(5.5 -(block_height-HF3)/1.1e6)
+                hn_reward = quantize_eight(24.0 - (block_height-HF3)/3.0e6)
                 if mining_reward < 0:
                     mining_reward = 0
 
             if block_height % 100000 == 0:
                 print(block_height, timestamp, mining_reward)
             mirror_hash = hashlib.blake2b(str(tx_list_to_hash).encode(), digest_size=20).hexdigest()
-            dev_reward(c, block_height, timestamp, mining_reward, mirror_hash)
+            dev_reward(c, block_height, timestamp, mining_reward, hn_reward, mirror_hash)
 
     conn.commit()
 
@@ -217,7 +211,7 @@ if __name__ == "__main__":
                 vacuum(config['DB_PATH'] + 'hyper.db')
 
             vacuum(config['DB_PATH'] + indexfile)
-            vacuum(config['DB_PATH'] + ledgerfile)
+            #vacuum(config['DB_PATH'] + ledgerfile)
             app_log.info("Creating tar.gz file")
             filename = tgzfile + '-{}.tar.gz'.format(block_height)
             tar = tarfile.open(config['DB_PATH'] + filename, "w:gz")
