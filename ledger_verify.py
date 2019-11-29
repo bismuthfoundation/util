@@ -19,6 +19,7 @@ from polysign.signerfactory import SignerFactory
 
 POW_FORK = 854600
 HF2 = 1200000
+HF3 = 1450000
 
 def verify_txs(app_log, db, full_ledger):
     with sqlite3.connect(db) as ledger_check:
@@ -401,17 +402,26 @@ def verify_rewards(app_log, db):
                 else:
                     rew_calc = 8.0
                     recipient = hn_acc
-            else:
+            elif db_block_height > - HF3:
                 if db_recipient == dev_acc:
                     rew_calc = 15 - 2.4 + db_block_height/5e5
                     recipient = dev_acc
                 else:
                     rew_calc = 24.0
                     recipient = hn_acc
+            else:
+                if db_recipient == dev_acc:
+                    rew_calc = 9.7
+                    if db_block_height < -HF3:
+                        rew_calc = 5.5 + (HF3+db_block_height)/1.1e6
+                    recipient = dev_acc
+                else:
+                    rew_calc = 10.0*(2.4 + (HF3+db_block_height-5)/3.0e6)
+                    recipient = hn_acc
 
             rew_difference = quantize_eight(db_amount - rew_calc)
             if (rew_difference != 0) or (db_recipient != recipient):
-                app_log.warning("Reward mismatch: {} {}".format(db_block_height,rew_difference))
+                app_log.warning("Reward mismatch: {} {} {} {}".format(db_block_height,rew_difference,db_amount,rew_calc))
                 invalid = invalid + 1
 
             if -db_block_height > print_step:
@@ -448,3 +458,4 @@ if __name__ == "__main__":
 
     with open(config['DB_PATH'] + 'ledger.json', 'w') as outfile:
         json.dump(data, outfile)
+
