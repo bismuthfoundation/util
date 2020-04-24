@@ -19,11 +19,13 @@ from collections import OrderedDict
 #                                   unregister,thresholds,checkfunc)
 #
 # out1 = assethandler.get_all_asset_ids()
-# print("All registered asset ids={}".format(out1))
-# 
-# asset_id = out1["asset_id"]["0"]
-# address = assethandler.get_registrant(asset_id)
-# print("Current registrant of {} = {}".format(asset_id,address))
+# if out1["total"]>0:
+#     print("All registered asset ids={}".format(out1))
+#     asset_id = out1["asset_id"]["0"]
+#     address = assethandler.get_registrant(asset_id)
+#     print("Current registrant of {} = {}".format(asset_id,address))
+# else:
+#     print("There are no '{}' transactions with Bismuth recipient '{}'".format(register,address))
 
 class BismuthSimpleAsset():
 
