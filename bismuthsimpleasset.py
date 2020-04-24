@@ -10,13 +10,14 @@ from collections import OrderedDict
 #servers=["wallet2.bismuth.online:8150"]
 #bismuth_client = bismuthclient.BismuthClient(verbose=False, servers_list=servers)
 #
-#register = "dragg:register"
-#unregister = "dragg:unregister"
-#address = "9ba0f8ca03439a8b4222b256a5f56f4f563f6d83755f525992fa5daf"
-#thresholds = {"reg": 0} # Price to register, for spam filtering
+#register = "myapp:register"
+#unregister = "myapp:unregister"
+#transfer = "myapp:transfer"
+#address = "3c59ca96b59fe713e3f2e5f27abf7fe809383fccd3d9ff96ffdfabce"
+#thresholds = {"reg": 9.5} # Price to register, for spam filtering
 #checkfunc = {"f": asset_validity_function} #Must be supplied by user
 #assethandler = BismuthSimpleAsset(bismuth_client,address,register,
-#                                  unregister,thresholds,checkfunc)
+#                         unregister,transfer,thresholds,checkfunc)
 #
 #out1 = assethandler.get_all_asset_ids()
 #N = out1["total"]
@@ -28,14 +29,15 @@ from collections import OrderedDict
 #        print("Current registrant of {} = {}".format(asset_id,address))
 #else:
 #    print("There are no '{}' transactions with Bismuth recipient '{}'".format(register,address))
-    
+
 class BismuthSimpleAsset():
 
-    def __init__(self,bismuth,address,reg,unreg,thresholds,checkfunc):
+    def __init__(self,bismuth,address,reg,unreg,transfer,thresholds,checkfunc):
         self.bismuth = bismuth
         self.SERVICE_ADDRESS = address
         self.register = reg
         self.unregister = unreg
+        self.transfer = transfer
         self.thresholds = thresholds #Amount required to register
         self.checkfunc = checkfunc   #User-supplied function to check for valid ids
 
@@ -56,9 +58,10 @@ class BismuthSimpleAsset():
         data = {}
         command = "addlistop"
         to = self.SERVICE_ADDRESS
-        op = self.register
         t_start = 0
         t_end = 9e10
+
+        op = self.register #Check for registrations
         bismuth_params = [to,op,self.thresholds["reg"],False,False,t_start,t_end]
         bisdata = self.bismuth.command(command, bismuth_params)
         j = 0
@@ -70,7 +73,7 @@ class BismuthSimpleAsset():
             data[j]["type"] = "reg"
             j = j + 1
 
-        op = self.unregister
+        op = self.unregister #Check for unregistrations
         bismuth_params = [to,op,0,False,False,t_start,t_end]
         bisdata = self.bismuth.command(command, bismuth_params)
         for i in range(0,len(bisdata)):
@@ -80,6 +83,28 @@ class BismuthSimpleAsset():
             data[j]["timestamp"] = bisdata[i][1]
             data[j]["type"] = "unreg"
             j = j + 1
+
+        op = self.transfer #Check for transfers
+        bismuth_params = [to,op,0,False,False,t_start,t_end]
+        bisdata = self.bismuth.command(command, bismuth_params)
+        for i in range(0,len(bisdata)):
+            try:
+                #Openfield = Comma separated id,recipient for transfers
+                [asset_id,recipient] = bisdata[i][11].split(",",1)
+                data[j] = {}
+                data[j]["asset_id"] = asset_id
+                data[j]["from"] = bisdata[i][2]
+                data[j]["timestamp"] = bisdata[i][1]
+                data[j]["type"] = "unreg"
+                j = j + 1
+                data[j] = {}
+                data[j]["asset_id"] = asset_id
+                data[j]["from"] = recipient
+                data[j]["timestamp"] = bisdata[i][1] + 0.001
+                data[j]["type"] = "reg"
+                j = j + 1
+            except:
+                pass
 
         out = self.__get_reg_unreg_all_sorted(data)
         out = self.__get_all_valid_asset_ids(out)
@@ -141,7 +166,7 @@ class BismuthSimpleAsset():
 
     def __get_reg_unreg_sorted(self,asset_id):
         """
-        Returns a dict of reg and unreg data, sorted by timestamp, for a single asset_id
+        Returns a dict of reg, unreg and transfer data, sorted by timestamp, for a single asset_id
         """
         regs = {}
         command = "listexactopdata"
@@ -154,6 +179,19 @@ class BismuthSimpleAsset():
         data = self.bismuth.command(command, bismuth_params)
         for i in range(0,len(data)):
             regs[data[i][1]]={'from': data[i][2], 'type': 'unreg'}
+
+        command = "addlistop"
+        t_start = 0
+        t_end = 9e10
+        to = self.SERVICE_ADDRESS
+        op = self.transfer
+        bismuth_params = [to,op,self.thresholds["reg"],False,False,t_start,t_end]
+        data = self.bismuth.command(command, bismuth_params)
+        for i in range(0,len(data)):
+            [id,recipient]=data[i][11].split(",",1)
+            if id == asset_id:
+                regs[data[i][1]]={'from': data[i][2], 'type': 'unreg'}
+                regs[data[i][1]+0.001]={'from': recipient, 'type': 'reg'}
 
         out = sorted(regs.items(), key=lambda x: x[0])
         return out
