@@ -13,4 +13,5 @@ These scripts can be combined in cronjobs, see instructions at top of snapshot_c
 * hypernode_monitoring directory: Script for monitoring Bismuth hypernodes, creates 3 json files
 
 Modules:
-bismuthsimpleasset.py: Module for handling on-chain assets with myapp:register, myapp:unregister and asset id.  
+
+* bismuthsimpleasset.py: Module for handling on-chain assets with myapp:register, myapp:unregister and asset id.  
