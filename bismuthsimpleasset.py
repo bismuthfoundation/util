@@ -4,15 +4,26 @@ from collections import OrderedDict
 # from bismuthsimpleasset import BismuthSimpleAsset
 # from bismuthclient import bismuthclient
 #
-# bismuth_client = bismuthclient.BismuthClient(
-#            verbose=options.verbose, servers_list=servers
+# def asset_validity_function(asset_id):
+#     return 1
+#
+# servers=["wallet2.bismuth.online:8150"]
+# bismuth_client = bismuthclient.BismuthClient(verbose=False, servers_list=servers)
+#
 # register = "myapp:register"
 # unregister = "myapp:unregister"
-# address = "Replace with your app's Bismuth account address"
+# address = "myapp_bismuth_service_address_here"
 # thresholds = {"reg": 50} # Price to register, for spam filtering
 # checkfunc = {"f": asset_validity_function} #Must be supplied by user
 # assethandler = BismuthSimpleAsset(bismuth_client,address,register,
 #                                   unregister,thresholds,checkfunc)
+#
+# out1 = assethandler.get_all_asset_ids()
+# print("All registered asset ids={}".format(out1))
+# 
+# asset_id = out1["asset_id"]["0"]
+# address = assethandler.get_registrant(asset_id)
+# print("Current registrant of {} = {}".format(asset_id,address))
 
 class BismuthSimpleAsset():
 
