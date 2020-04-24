@@ -1,32 +1,34 @@
 from collections import OrderedDict
 
-# Usage:
-# from bismuthsimpleasset import BismuthSimpleAsset
-# from bismuthclient import bismuthclient
+#Usage:
+#from bismuthsimpleasset import BismuthSimpleAsset
+#from bismuthclient import bismuthclient
 #
-# def asset_validity_function(asset_id):
-#     return 1
+#def asset_validity_function(asset_id):
+#    return 1
 #
-# servers=["wallet2.bismuth.online:8150"]
-# bismuth_client = bismuthclient.BismuthClient(verbose=False, servers_list=servers)
+#servers=["wallet2.bismuth.online:8150"]
+#bismuth_client = bismuthclient.BismuthClient(verbose=False, servers_list=servers)
 #
-# register = "myapp:register"
-# unregister = "myapp:unregister"
-# address = "myapp_bismuth_service_address_here"
-# thresholds = {"reg": 50} # Price to register, for spam filtering
-# checkfunc = {"f": asset_validity_function} #Must be supplied by user
-# assethandler = BismuthSimpleAsset(bismuth_client,address,register,
-#                                   unregister,thresholds,checkfunc)
+#register = "dragg:register"
+#unregister = "dragg:unregister"
+#address = "9ba0f8ca03439a8b4222b256a5f56f4f563f6d83755f525992fa5daf"
+#thresholds = {"reg": 0} # Price to register, for spam filtering
+#checkfunc = {"f": asset_validity_function} #Must be supplied by user
+#assethandler = BismuthSimpleAsset(bismuth_client,address,register,
+#                                  unregister,thresholds,checkfunc)
 #
-# out1 = assethandler.get_all_asset_ids()
-# if out1["total"]>0:
-#     print("All registered asset ids={}".format(out1))
-#     asset_id = out1["asset_id"]["0"]
-#     address = assethandler.get_registrant(asset_id)
-#     print("Current registrant of {} = {}".format(asset_id,address))
-# else:
-#     print("There are no '{}' transactions with Bismuth recipient '{}'".format(register,address))
-
+#out1 = assethandler.get_all_asset_ids()
+#N = out1["total"]
+#if N>0:
+#    print("All registered asset ids={}".format(out1))
+#    for i in range(0,N):
+#        asset_id = out1["asset_id"][str(i)]
+#        address = assethandler.get_registrant(asset_id)
+#        print("Current registrant of {} = {}".format(asset_id,address))
+#else:
+#    print("There are no '{}' transactions with Bismuth recipient '{}'".format(register,address))
+    
 class BismuthSimpleAsset():
 
     def __init__(self,bismuth,address,reg,unreg,thresholds,checkfunc):
