@@ -1,6 +1,9 @@
 from collections import OrderedDict
 
 # Usage:
+# from bismuthsimpleasset import BismuthSimpleAsset
+# from bismuthclient import bismuthclient
+#
 # bismuth_client = bismuthclient.BismuthClient(
 #            verbose=options.verbose, servers_list=servers
 # register = "myapp:register"
