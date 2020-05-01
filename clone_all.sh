@@ -1,7 +1,7 @@
 #!/bin/sh
 # This script clones all the repos of the Bismuthfoundation
 # usage:
-#     sudo apt-get install curl
+#     sudo apt-get install curl git
 #     mkdir archive
 #     cd archive
 #     wget https://raw.githubusercontent.com/bismuthfoundation/util/master/clone_all.sh
