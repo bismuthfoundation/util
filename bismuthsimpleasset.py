@@ -49,40 +49,46 @@ class BismuthSimpleAsset():
         registrant = self.__get_registrant_from_regs(regs)
         return registrant
 
-    def get_all_asset_ids(self):
+    def get_all_asset_ids(self,asset_search):
         """
         Returns a dict with all valid asset ids submitted to the SERVICE_ADDRESS.
         An asset id can be associated with multiple accounts, if registered and
-        unregistered multiple times.
+        unregistered multiple times. Only assets with substring = asset_search
+        are returned.
         """
         data = {}
         command = "addlistop"
         to = self.SERVICE_ADDRESS
         t_start = 0
         t_end = 9e10
+        L = len(asset_search)
 
         op = self.register #Check for registrations
         bismuth_params = [to,op,self.thresholds["reg"],False,False,t_start,t_end]
         bisdata = self.bismuth.command(command, bismuth_params)
         j = 0
         for i in range(0,len(bisdata)):
-            data[j] = {}
-            data[j]["asset_id"] = bisdata[i][11]
-            data[j]["from"] = bisdata[i][2]
-            data[j]["timestamp"] = bisdata[i][1]
-            data[j]["type"] = "reg"
-            j = j + 1
+            asset_id = bisdata[i][11]
+            if (L==0) or (asset_id.find(asset_search)>=0):
+                data[j] = {}
+                data[j]["asset_id"] = bisdata[i][11]
+                data[j]["from"] = bisdata[i][2]
+                data[j]["timestamp"] = bisdata[i][1]
+                data[j]["type"] = "reg"
+                j = j + 1
 
         op = self.unregister #Check for unregistrations
         bismuth_params = [to,op,0,False,False,t_start,t_end]
         bisdata = self.bismuth.command(command, bismuth_params)
         for i in range(0,len(bisdata)):
-            data[j] = {}
-            data[j]["asset_id"] = bisdata[i][11]
-            data[j]["from"] = bisdata[i][2]
-            data[j]["timestamp"] = bisdata[i][1]
-            data[j]["type"] = "unreg"
-            j = j + 1
+            asset_id = bisdata[i][11]
+            if (L==0) or (asset_id.find(asset_search)>=0):
+                data[j] = {}
+                data[j]["asset_id"] = bisdata[i][11]
+                data[j]["from"] = bisdata[i][2]
+                data[j]["timestamp"] = bisdata[i][1]
+                data[j]["type"] = "unreg"
+                j = j + 1
 
         op = self.transfer #Check for transfers
         bismuth_params = [to,op,0,False,False,t_start,t_end]
@@ -91,18 +97,19 @@ class BismuthSimpleAsset():
             try:
                 #Openfield = Comma separated id,recipient for transfers
                 [asset_id,recipient] = bisdata[i][11].split(",",1)
-                data[j] = {}
-                data[j]["asset_id"] = asset_id
-                data[j]["from"] = bisdata[i][2]
-                data[j]["timestamp"] = bisdata[i][1]
-                data[j]["type"] = "unreg"
-                j = j + 1
-                data[j] = {}
-                data[j]["asset_id"] = asset_id
-                data[j]["from"] = recipient
-                data[j]["timestamp"] = bisdata[i][1] + 0.001
-                data[j]["type"] = "reg"
-                j = j + 1
+                if (L==0) or (asset_id.find(asset_search)>=0):
+                    data[j] = {}
+                    data[j]["asset_id"] = asset_id
+                    data[j]["from"] = bisdata[i][2]
+                    data[j]["timestamp"] = bisdata[i][1]
+                    data[j]["type"] = "unreg"
+                    j = j + 1
+                    data[j] = {}
+                    data[j]["asset_id"] = asset_id
+                    data[j]["from"] = recipient
+                    data[j]["timestamp"] = bisdata[i][1] + 0.001
+                    data[j]["type"] = "reg"
+                    j = j + 1
             except:
                 pass
 
@@ -159,7 +166,8 @@ class BismuthSimpleAsset():
         """
         regs = {}
         for i in range(0,len(data)):
-            regs[data[i]['timestamp']]={'from': data[i]['from'], 'asset_id': data[i]['asset_id'], 'type': data[i]['type']}
+            regs[data[i]['timestamp']]={'from': data[i]['from'], 'asset_id': data[i]['asset_id'],
+                                        'type': data[i]['type']}
 
         out = sorted(regs.items(), key=lambda x: x[0])
         return out
