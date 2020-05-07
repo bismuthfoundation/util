@@ -147,9 +147,14 @@ class BismuthSimpleAsset():
                     except:
                         pass
 
-        # Remove duplicates and keep order
-        for i in range(0,j):
-            asset_id = asset_ids[str(i)]
+        # Remove duplicates and sort by asset_id
+        sorted_x = sorted(asset_ids.items(), key=lambda x: x[1])
+        asset_ids = {}
+        i = 0
+        for item in sorted_x:
+            asset_id = item[1]
+            asset_ids[str(i)] = asset_id
+            i = i + 1
             addr = out[asset_id]["address"]
             out[asset_id]["address"] = list(OrderedDict.fromkeys(addr))
 
