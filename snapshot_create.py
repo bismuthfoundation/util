@@ -110,7 +110,8 @@ def redo_mirror_blocks(ledgerfile):
     print(ledgerfile)
     c.execute("SELECT max(block_height) from transactions;")
     max_height = c.fetchone()[0]
-
+    max_height = math.floor(max_height / 1000) * 1000
+    
     c.execute("DELETE FROM transactions WHERE address = 'Development Reward'")
     c.execute("DELETE FROM transactions WHERE address = 'Hypernode Payouts'")
 
