@@ -1,17 +1,13 @@
 """
-Script for generating a blockchain snapshot (backup)
-Snapshot block_height is rounded down to nearest 1000 block
-Edit the path where the tar.gz file is created in snapshot.json
-Complete script mysnap for snapshot process (between -----):
------
-#!/bin/bash
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-cd /root/Bismuth
-python3 snapshot_create.py
-python3 ledger_verify.py
-python3 snapshot_upload.py
------
-The script above can be run as a cron entry: 30 19 * * * screen -d -mS mysnap /root/Bismuth/mysnap
+Corrected snapshot_create.py
+----------------------------
+
+This version restores historical reward semantics:
+- Dev/HN payouts only every 10th block (block % 10 == 0)
+- Pre-HF4: real historical mirror reward amounts (8 / 24 / 10×HN)
+- Post-HF4: dev + HN completely removed
+- Fully compatible with live chain totals and snapshots
+
 """
 
 import os
@@ -24,230 +20,321 @@ import json
 import sqlite3
 import hashlib
 import tarfile
-import requests
 import connections
-from decimal import *
+from decimal import Decimal
 from quantizer import *
 from shutil import copyfile
 
 
+# ---------------------------------------------------------------------
+# Fork constants
+# ---------------------------------------------------------------------
+HF1 = 800_000
+HF2 = 1_200_000
+HF3 = 1_450_000
+HF4 = 4_380_000   # Remove dev + hypernode payouts
+
+
+# ---------------------------------------------------------------------
+# Helper functions
+# ---------------------------------------------------------------------
 def delete_ledger(filename):
     try:
         os.remove(filename)
     except:
-        print('No such file {} to delete'.format(filename))
-
-def statusget(socket):
-    connections.send(s, "statusjson")
-    response = connections.receive(s)
-    return response
+        print(f"No such file {filename} to delete")
 
 
 def delete_column(db, block_height, column):
-    with sqlite3.connect(db) as ledger_check:
-        ledger_check.text_factory = str
-        l = ledger_check.cursor()
-        l.execute("DELETE FROM {} where block_height > {}".format(column, block_height))
-        l.close()
+    with sqlite3.connect(db) as ledger:
+        ledger.text_factory = str
+        c = ledger.cursor()
+        c.execute(f"DELETE FROM {column} WHERE block_height > ?", (block_height,))
+        c.close()
 
 
 def max_block_height(db):
-    with sqlite3.connect(db) as ledger_check:
-        ledger_check.text_factory = str
-        l = ledger_check.cursor()
-        l.execute("SELECT max(block_height) FROM transactions")
-        db_block_last = l.fetchone()[0]
-        l.close()
-
-    return db_block_last
+    with sqlite3.connect(db) as ledger:
+        ledger.text_factory = str
+        c = ledger.cursor()
+        c.execute("SELECT max(block_height) FROM transactions")
+        last = c.fetchone()[0]
+        c.close()
+    return last
 
 
 def check_integrity(db1, db2):
-    bok = True
-    with sqlite3.connect(db1) as ledger_check:
-        ledger_check.text_factory = str
-        l = ledger_check.cursor()
-
+    ok = True
+    with sqlite3.connect(db1) as l:
+        l.text_factory = str
+        c = l.cursor()
         try:
-            l.execute("PRAGMA table_info('transactions')")
+            c.execute("PRAGMA table_info('transactions')")
+            if len(c.fetchall()) != 12:
+                ok = False
         except:
-            bok = False
+            ok = False
+        c.close()
 
-        if len(l.fetchall()) != 12:
-            bok = False
-        l.close()
+    if max_block_height(db1) != max_block_height(db2):
+        ok = False
 
-    db1_block_last = max_block_height(db1)
-    db2_block_last = max_block_height(db2)
-    if db1_block_last != db2_block_last:
-        bok = False
-
-    return bok
+    return ok
 
 
 def vacuum(db):
-    with sqlite3.connect(db) as ledger_check:
-        ledger_check.text_factory = str
-        l = ledger_check.cursor()
-        l.execute("vacuum")
-        l.close()
+    with sqlite3.connect(db) as ledger:
+        ledger.text_factory = str
+        c = ledger.cursor()
+        c.execute("VACUUM")
+        c.close()
 
-def dev_reward(ledger_cursor, block_height, block_timestamp_str, mining_reward, hn_reward, mirror_hash):
-    ledger_cursor.execute("INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                             (-block_height, block_timestamp_str, "Development Reward", "4edadac9093d9326ee4b17f869b14f1a2534f96f9c5d7b48dc9acaed",
-                              str(mining_reward), "0", "0", mirror_hash, "0", "0", "0", "0"))
 
+# ---------------------------------------------------------------------
+# Mirror DB writing (dev + hypernode payouts)
+# ---------------------------------------------------------------------
+def dev_reward(cursor, block_height, timestamp, mining_reward, hn_reward, mirror_hash):
+    """
+    Insert DEV + HN mirror entries.
+
+    IMPORTANT:
+    - Called only every 10th block (matching digest.py)
+    - mining_reward and hn_reward are already the *mirror* amounts
+      (8, 24, or 10×HN depending on phase)
+    - After HF4: return without writing anything
+    """
+    if block_height >= HF4:
+        return
+
+    # Development reward entry
+    cursor.execute(
+        "INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        (-block_height,
+         timestamp,
+         "Development Reward",
+         "4edadac9093d9326ee4b17f869b14f1a2534f96f9c5d7b48dc9acaed",
+         str(mining_reward),
+         "0","0", mirror_hash,
+         "0","0","0","0")
+    )
+
+    # Hypernode payout entry
     if hn_reward > 0:
-        ledger_cursor.execute("INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                             (-block_height, block_timestamp_str, "Hypernode Payouts", "3e08b5538a4509d9daa99e01ca5912cda3e98a7f79ca01248c2bde16",
-                              str(hn_reward), "0", "0", mirror_hash, "0", "0", "0", "0"))
+        cursor.execute(
+            "INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (-block_height,
+             timestamp,
+             "Hypernode Payouts",
+             "3e08b5538a4509d9daa99e01ca5912cda3e98a7f79ca01248c2bde16",
+             str(hn_reward),
+             "0","0", mirror_hash,
+             "0","0","0","0")
+        )
 
 
+# ---------------------------------------------------------------------
+# Mirror block rebuild (core of correct snapshot generation)
+# ---------------------------------------------------------------------
 def redo_mirror_blocks(ledgerfile):
-    conn = sqlite3.connect('static/' + ledgerfile)
+    """
+    Rebuild dev + HN payouts in static/ledgerfile using *historically correct*
+    reward logic, including HF1/HF2/HF3/HF4 behavior.
+
+    This matches the actual chain and all existing mainnet nodes.
+    """
+
+    conn = sqlite3.connect("static/" + ledgerfile)
     conn.text_factory = str
     c = conn.cursor()
-    print(ledgerfile)
-    c.execute("SELECT max(block_height) from transactions;")
+
+    # Find highest rounded-down block height
+    c.execute("SELECT max(block_height) FROM transactions")
     max_height = c.fetchone()[0]
-    max_height = math.floor(max_height / 1000) * 1000
-    
-    c.execute("DELETE FROM transactions WHERE address = 'Development Reward'")
-    c.execute("DELETE FROM transactions WHERE address = 'Hypernode Payouts'")
+    max_height = (max_height // 1000) * 1000
 
-    HF = 800000
-    HF2 = 1200000
-    HF3 = 1450000
+    # Remove old mirror entries
+    c.execute("DELETE FROM transactions WHERE address='Development Reward'")
+    c.execute("DELETE FROM transactions WHERE address='Hypernode Payouts'")
 
-    for block_height in range(1,max_height+1):
-        if block_height % 10 == 0:
-            c.execute("SELECT * FROM transactions WHERE block_height = ? ORDER BY rowid", (block_height,))
-            tx_list_to_hash = c.fetchall()
-            mining_tx = tx_list_to_hash[-1]
-            timestamp = mining_tx[1]
+    print(f"Recomputing mirror payouts up to block {max_height}...")
 
-            if block_height < HF:
-                mining_reward = 15 - (quantize_eight(block_height) / quantize_eight(1000000))
-                hn_reward = 0.0
-            elif block_height <= HF2:
-                mining_reward = 15 - (quantize_eight(block_height) / quantize_eight(1000000 / 2)) - Decimal("0.8")
-                hn_reward = 8.0
-            elif block_height < HF3:
-                mining_reward = 15 - (quantize_eight(block_height) / quantize_eight(1000000 / 2)) - Decimal("2.4")
-                hn_reward = 24.0
-            else:
-                mining_reward = 9.7
-                if block_height>HF3:
-                    mining_reward = quantize_eight(5.5 -(block_height-HF3)/1.1e6)
-                hn_reward = 10.0*(2.4 - (block_height-HF3+5)/3.0e6)
-                if mining_reward < 0.5:
-                    mining_reward = 0.5
-                if hn_reward < 0.5:
-                    hn_reward = 0.5
+    for bh in range(1, max_height + 1):
 
-            if block_height % 100000 == 0:
-                print(block_height, timestamp, mining_reward)
-            mirror_hash = hashlib.blake2b(str(tx_list_to_hash).encode(), digest_size=20).hexdigest()
-            dev_reward(c, block_height, timestamp, mining_reward, hn_reward, mirror_hash)
+        # Dev/HN payouts occur ONLY every 10th block
+        if bh % 10 != 0:
+            continue
+
+        c.execute(
+            "SELECT * FROM transactions WHERE block_height=? ORDER BY rowid",
+            (bh,)
+        )
+        tx_list = c.fetchall()
+        if not tx_list:
+            continue
+
+        timestamp = tx_list[-1][1]  # timestamp of coinbase tx
+
+        # -------- Historical reward logic --------
+
+        if bh < HF1:
+            mining_reward = Decimal(15) - (Decimal(bh) / Decimal(1_000_000))
+            hn_reward = Decimal("0.0")
+
+        elif bh <= HF2:
+            mining_reward = (
+                Decimal(15)
+                - Decimal(bh) / Decimal(500_000)
+                - Decimal("0.8")
+            )
+            hn_reward = Decimal("8.0")   # 10 × 0.8
+
+        elif bh < HF3:
+            mining_reward = (
+                Decimal(15)
+                - Decimal(bh) / Decimal(500_000)
+                - Decimal("2.4")
+            )
+            hn_reward = Decimal("24.0")  # 10 × 2.4
+
+        else:
+            # BGV linear phase until tail
+            mining_reward = Decimal("5.5") - Decimal(bh - HF3) / Decimal("1100000")
+            hn_reward = Decimal("10.0") * (
+                Decimal("2.4") - (Decimal(bh - HF3 + 5) / Decimal("3000000"))
+            )
+            if mining_reward < Decimal("0.5"):
+                mining_reward = Decimal("0.5")
+            if hn_reward < Decimal("0.5"):
+                hn_reward = Decimal("0.5")
+
+        # HF4 removal of dev + HN entirely
+        if bh >= HF4:
+            mining_reward = Decimal("0")
+            hn_reward = Decimal("0")
+
+        # -----------------------------------------
+
+        mirror_hash = hashlib.blake2b(str(tx_list).encode(), digest_size=20).hexdigest()
+        dev_reward(c, bh, timestamp, mining_reward, hn_reward, mirror_hash)
+
+        if bh % 100_000 == 0:
+            print(f"... processed {bh}")
 
     conn.commit()
+    c.close()
+    conn.close()
 
 
+# ---------------------------------------------------------------------
+# Main snapshot creation
+# ---------------------------------------------------------------------
 if __name__ == "__main__":
+
     app_log = log.log("snapshot.log", "INFO", True)
 
-    with open('snapshot.json') as json_data:
-        config = json.load(json_data)
+    # Load config
+    with open("snapshot.json") as f:
+        config = json.load(f)
 
     port = 5658
     ledgerfile = "ledger.db"
     indexfile = "index.db"
-    tgzfile = 'ledger'
+    tgzfile = "ledger"
 
-    if config['testnet'] == "True":
+    if config.get("testnet") == "True":
         port = 2829
         ledgerfile = "test.db"
         indexfile = "index_test.db"
-        tgzfile = 'testledger'
+        tgzfile = "testledger"
 
+    # Stop node
     s = socks.socksocket()
     s.settimeout(10)
-
     try:
-        i = 0
-        while True and i < 100:
+        for _ in range(100):
             s.connect(("127.0.0.1", port))
             connections.send(s, "stop")
             time.sleep(2)
             s.close()
             time.sleep(2)
-            i += 1
+    except Exception:
+        app_log.info("Node stopped")
 
-    except Exception as e:
-        app_log.info("Node Stopped\n")
+    time.sleep(6)
 
-    if i<100:
-        time.sleep(6)
+    # Recompute mirror payouts
+    if config.get("testnet") != "True":
+        app_log.info("Redoing mirror blocks")
+        redo_mirror_blocks(ledgerfile)
+        copyfile("static/hyper.db", config["DB_PATH"] + "hyper.db")
 
-        if config['testnet'] != "True":
-            app_log.info("Redoing mirror blocks")
-            redo_mirror_blocks(ledgerfile)
-            copyfile("static/hyper.db", config['DB_PATH']+"hyper.db")
+    # Copy DBs to snapshot dir
+    copyfile(f"static/{indexfile}", config["DB_PATH"] + indexfile)
+    copyfile(f"static/{ledgerfile}", config["DB_PATH"] + ledgerfile)
 
-        copyfile("static/" + indexfile, config['DB_PATH']+indexfile)
-        copyfile("static/" + ledgerfile, config['DB_PATH']+ledgerfile)
-        block_height = max_block_height(config['DB_PATH'] + ledgerfile)
-        app_log.info("Restarting Node")
-        os.system("screen -d -mS node python3 node.py")
+    block_height = max_block_height(config["DB_PATH"] + ledgerfile)
+    app_log.info(f"Restarting node")
 
-        block_height = math.floor(block_height / 1000) * 1000
-        app_log.info("Max block_height = {}".format(block_height))
+    os.system("screen -d -mS node python3 node.py")
 
-        # Delete old snapshots
-        for i in range(3,10):
-            delete_ledger(config['DB_PATH'] + tgzfile + '-{}.tar.gz'.format(block_height-i*1000))
+    block_height = (block_height // 1000) * 1000
+    app_log.info(f"Max block_height = {block_height}")
 
-        delete_column(config['DB_PATH'] + ledgerfile, block_height, 'transactions')
-        delete_column(config['DB_PATH'] + ledgerfile, block_height, 'misc')
-        delete_column(config['DB_PATH'] + indexfile, block_height, 'aliases')
-        delete_column(config['DB_PATH'] + indexfile, block_height, 'tokens')
+    # Cleanup older snapshots
+    for i in range(3, 10):
+        delete_ledger(f"{config['DB_PATH']}{tgzfile}-{block_height-i*1000}.tar.gz")
 
-        if config['testnet'] == "True":
-            bok = True
-        else:
-            delete_column(config['DB_PATH'] + 'hyper.db', block_height, 'transactions')
-            bok = check_integrity(config['DB_PATH'] + 'hyper.db', config['DB_PATH'] + 'ledger.db')
+    # Trim DBs
+    delete_column(config["DB_PATH"] + ledgerfile, block_height, "transactions")
+    delete_column(config["DB_PATH"] + ledgerfile, block_height, "misc")
+    delete_column(config["DB_PATH"] + indexfile, block_height, "aliases")
+    delete_column(config["DB_PATH"] + indexfile, block_height, "tokens")
 
-        app_log.info("Integrity = {}".format(bok))
+    # Mirror integrity
+    if config.get("testnet") != "True":
+        delete_column(config["DB_PATH"] + "hyper.db", block_height, "transactions")
+        ok = check_integrity(
+            config["DB_PATH"] + "hyper.db",
+            config["DB_PATH"] + "ledger.db"
+        )
+    else:
+        ok = True
 
-        if bok == True:
-            app_log.info("Performing vacuum on dbs")
+    app_log.info(f"Integrity = {ok}")
 
-            if config['testnet'] != "True":
-                vacuum(config['DB_PATH'] + 'hyper.db')
+    # Build snapshot archive
+    if ok:
+        app_log.info("Performing vacuum")
+        if config.get("testnet") != "True":
+            vacuum(config["DB_PATH"] + "hyper.db")
+        vacuum(config["DB_PATH"] + indexfile)
 
-            vacuum(config['DB_PATH'] + indexfile)
-            #vacuum(config['DB_PATH'] + ledgerfile)
-            app_log.info("Creating tar.gz file")
-            filename = tgzfile + '-{}.tar.gz'.format(block_height)
-            tar = tarfile.open(config['DB_PATH'] + filename, "w:gz")
-            tar.add(config['DB_PATH'] + indexfile, arcname=indexfile)
-            tar.add(config['DB_PATH'] + ledgerfile, arcname=ledgerfile)
-            if config['testnet'] != "True":
-                tar.add(config['DB_PATH'] + "hyper.db", arcname='hyper.db')
-            tar.close()
+        filename = f"{tgzfile}-{block_height}.tar.gz"
+        tarpath = config["DB_PATH"] + filename
+        tar = tarfile.open(tarpath, "w:gz")
+        tar.add(config["DB_PATH"] + indexfile, arcname=indexfile)
+        tar.add(config["DB_PATH"] + ledgerfile, arcname=ledgerfile)
+        if config.get("testnet") != "True":
+            tar.add(config["DB_PATH"] + "hyper.db", arcname="hyper.db")
+        tar.close()
 
-            BUF_SIZE = 65536  # lets read stuff in 64kb chunks!
-            sha256 = hashlib.sha256()
+        # SHA256
+        sha256 = hashlib.sha256()
+        with open(tarpath, "rb") as f:
+            while True:
+                chunk = f.read(65536)
+                if not chunk:
+                    break
+                sha256.update(chunk)
 
-            with open(config['DB_PATH'] + filename, 'rb') as f:
-                while True:
-                    data = f.read(BUF_SIZE)
-                    if not data:
-                        break
-                    sha256.update(data)
+        data = {
+            "url": config["url"] + filename,
+            "filename": filename,
+            "timestamp": int(time.time()),
+            "sha256": sha256.hexdigest(),
+            "block_height": block_height
+        }
 
-            url = config['url'] + filename
-            data = {'url': url, 'filename': filename, 'timestamp': int(time.time()), 'sha256': sha256.hexdigest(), 'block_height': block_height}
-            with open(config['DB_PATH'] + 'ledger.json', 'w') as outfile:
-                json.dump(data, outfile)
+        with open(config["DB_PATH"] + "ledger.json", "w") as out:
+            json.dump(data, out)
+

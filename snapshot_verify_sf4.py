@@ -12,10 +12,14 @@ from decimal import Decimal
 
 STEP = 10000  # Print steps
 DB_START = 900000
+# IMPORTANT: database hash (the one you computed for your ledger)
 DB_HASH = "6ce0ed5c30b1181a676a2e9c870ae8fdf6f210e518e0f1f6ee923e20"
+
+HF4 = 4_380_000  # soft fork height: dev + HN rewards removed on chain
 
 
 def check_dupes(db):
+    """Look for duplicate signatures in the ledger (except a few allowed cases)."""
     with sqlite3.connect(db) as ledger_check:
         ledger_check.text_factory = str
         h3 = ledger_check.cursor()
@@ -44,7 +48,7 @@ def check_dupes(db):
 
 
 def hash_blocks_until(db, n):
-    """Returns combined hash of all block hashes in db until block_height n"""
+    """Returns combined SHA224 of all block_hash values in db until block_height n."""
     sha224 = hashlib.sha224()
     with sqlite3.connect(db) as ledger_check:
         ledger_check.text_factory = str
@@ -148,7 +152,7 @@ def check_block(block_height_new, miner_address, nonce, db_block_hash, diff0,
     """
     Verify that a block's heavy3 PoW meets the stored difficulty.
 
-    Simplified: no POW_FORK / FORK_DIFF constants needed.
+    Simplified: no legacy POW_FORK / FORK_DIFF constants.
     """
     bok = False
     real_diff = diffme_heavy3(miner_address, nonce, db_block_hash)
@@ -290,6 +294,47 @@ def download_file(url, filename):
         raise
 
 
+def check_post_hf4_rewards(db, hf4=HF4):
+    """
+    HF4-specific sanity check:
+    Ensure there are NO dev / hypernode mirror payouts for blocks >= HF4.
+
+    Mirror entries use negative block_height: -real_block_height.
+    So real blocks >= HF4 correspond to block_height <= -HF4.
+    """
+    limit = -hf4
+
+    with sqlite3.connect(db) as conn:
+        conn.text_factory = str
+        c = conn.cursor()
+
+        # Dev rewards after HF4?
+        c.execute("""
+            SELECT COUNT(*) FROM transactions
+            WHERE address = 'Development Reward'
+              AND block_height <= ?
+        """, (limit,))
+        dev_count = c.fetchone()[0]
+
+        # HN payouts after HF4?
+        c.execute("""
+            SELECT COUNT(*) FROM transactions
+            WHERE address = 'Hypernode Payouts'
+              AND block_height <= ?
+        """, (limit,))
+        hn_count = c.fetchone()[0]
+
+    if dev_count or hn_count:
+        print(
+            f"ERROR: Found dev/HN rewards after HF4 (>= {hf4}): "
+            f"dev={dev_count}, hn={hn_count}"
+        )
+        return False
+
+    print(f"HF4 economics OK: no dev/HN mirror rewards for blocks >= {hf4}")
+    return True
+
+
 if __name__ == '__main__':
     print("Functions included from the mining_heavy3 module")
     print("Verifying static/ledger.db")
@@ -299,12 +344,10 @@ if __name__ == '__main__':
     print(f"---> db hash is: {db_hash}")
 
     if db_hash != DB_HASH:
-        print('---> Incorrect db hash (expected {}, got {})'.format(DB_HASH, db_hash))
-        # You can choose to exit here or still run the deep checks.
-    else:
-        print('Correct db hash')
+        print('---> WARNING: db hash does not match anchor (expected {}, got {})'.format(DB_HASH, db_hash))
+        # You can choose to return/exit here if you want strict anchoring.
 
-    # Run deep checks regardless (or keep them under the 'else' if you prefer strict anchor)
+    # Deep checks (you can gate these under the DB_HASH match if you prefer strict mode)
     verify_blocks('static/ledger.db', DB_START)
     print("---> Verifying mining difficulties")
     verify_diff('static/ledger.db')
@@ -312,3 +355,5 @@ if __name__ == '__main__':
     bok = check_dupes('static/ledger.db')
     if bok:
         print("No duplicate signatures found")
+    print("---> Checking HF4 reward removal (no dev/HN after 4,380,000)")
+    check_post_hf4_rewards('static/ledger.db')
