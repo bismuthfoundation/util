@@ -34,7 +34,7 @@ MILESTONE_BLOCK_X = [10, 20, 30, 40, 50]  # in millions (x-axis positions)
 
 def get_network_height():
     """
-    Returns (network_height, last_block_time_str) from bismuth.im API.
+    Returns (network_height, last_block_time_str_or_ts) from bismuth.im API.
     Returns (False, False) if the API is not available.
     """
     http = urllib3.PoolManager()
@@ -70,7 +70,7 @@ def block_rewards(height: int):
         miner = Decimal("15") - h / Decimal("1000000")
         hn = Decimal("0")
 
-    # Phase 2: HF1 .. HF2 (inclusive of HF2, per snapshot_create)
+    # Phase 2: HF1 .. HF2 (inclusive)
     elif height <= HF2:
         miner = (
             Decimal("15")
@@ -103,7 +103,6 @@ def block_rewards(height: int):
         if hn < Decimal("0.5"):
             hn = Decimal("0.5")
 
-    # Quantize miner/HN to 8 decimals, like ledger
     miner = quantize_eight(miner)
     hn = quantize_eight(hn)
 
@@ -211,17 +210,26 @@ if network_height and actual_supply > 0:
 
 milestone_x = []          # x-positions (in millions) for vertical lines
 tail_label_index = None   # index of tail date in convert_to_date
+current_x = None          # x position of current height
+current_date_str = None   # readable date for current height
 
 if last_block_mined and network_height:
-    # last_block_mined can be a float (new format) or a "YYYY/MM/DD,HH:MM:SS" string (old)
+    # last_block_mined can be a float (UNIX) or a "YYYY/MM/DD,HH:MM:SS" string
     if isinstance(last_block_mined, (float, int)):
-        # already a UNIX timestamp
         unixtime_last_block = float(last_block_mined)
+
+        # Some nodes may return ms; normalize to seconds
+        if unixtime_last_block > 1e12:
+            unixtime_last_block /= 1000.0
     else:
-        # old format
         unixtime_last_block = time.mktime(
             datetime.datetime.strptime(last_block_mined, "%Y/%m/%d,%H:%M:%S").timetuple()
         )
+
+    current_x = network_height / 1_000_000.0
+    current_date_str = datetime.datetime.utcfromtimestamp(
+        unixtime_last_block
+    ).strftime('%Y/%m/%d')
 
     # Milestones at absolute heights: 10M, 20M, 30M, 40M, 50M
     for x in MILESTONE_BLOCK_X:
@@ -236,19 +244,20 @@ if last_block_mined and network_height:
         )
         convert_to_date.append(
             datetime.datetime.utcfromtimestamp(est_time_of_block)
-            .strftime('%Y/%m/%d %H:%M:%S')
+            .strftime('%Y/%m/%d')
         )
         milestone_x.append(x)
 
-    # estimated time when miner reward hits tail (6.95M) – informational only
+    # estimated time when miner reward hits tail (6.95M)
     tail_height = 6_950_000
     if tail_height > network_height:
         est_time_tail = unixtime_last_block + ((tail_height - network_height) * BLOCKTIME)
         convert_to_date.append(
             datetime.datetime.utcfromtimestamp(est_time_tail)
-            .strftime('%Y/%m/%d %H:%M:%S')
+            .strftime('%Y/%m/%d')
         )
         tail_label_index = len(convert_to_date) - 1
+
 
 # ----------------------------
 # First plot: total supply
@@ -261,9 +270,23 @@ if last_block_mined and network_height:
 
     # milestone verticals (fixed at 10,20,30,40,50 where applicable)
     for x in milestone_x:
-        plt.axvline(x=x)
+        plt.axvline(x=x, color='C0')
 
-    # milestone date labels at those x positions
+    # vertical line at current block height (light grey)
+    if current_x is not None:
+        plt.axvline(x=current_x, color='lightgrey', linestyle='--', linewidth=1)
+        # date label for current height near the top (y=95)
+        if current_date_str:
+            plt.text(
+                current_x,
+                95,
+                current_date_str,
+                fontsize=8,
+                ha='center',
+                color='grey'
+            )
+
+    # milestone date labels at those x positions (future only)
     for idx, x in enumerate(milestone_x):
         if idx < len(convert_to_date):
             plt.text(x, 90, convert_to_date[idx], fontsize=8)
@@ -346,24 +369,77 @@ if last_block_mined and network_height and actual_mining_reward:
 
     # milestone verticals (same x as above)
     for x in milestone_x:
-        plt.axvline(x=x)
+        plt.axvline(x=x, color='C0')
 
-    # milestone dates a bit lower in y
+    # vertical line at current block height (light grey)
+    if current_x is not None:
+        plt.axvline(x=current_x, color='lightgrey', linestyle='--', linewidth=1)
+
+        # date label for current block at the top (a bit higher)
+        if current_date_str:
+            plt.text(
+                current_x,
+                15.2,          # moved up
+                current_date_str,
+                fontsize=8,
+                ha='center',
+                color='grey'
+            )
+
+        # block height label further below x-axis
+        plt.text(
+            current_x,
+            -0.8,           # moved down
+            f"{network_height:,}",
+            ha='center',
+            fontsize=8,
+            color='grey'
+        )
+
+    # ------------------------------------------------------
+    # Tail emission date line and label (0.5 BIS floor)
+    # ------------------------------------------------------
+    tail_height = 6_950_000
+    tail_x = tail_height / 1_000_000.0
+
+    if tail_label_index is not None and last_block_mined and network_height:
+        tail_date = convert_to_date[tail_label_index]
+
+        # thin vertical line for tail event
+        plt.axvline(x=tail_x, color='lightgrey', linestyle=':', linewidth=1)
+
+        # label above the line, slightly lower than current-date label
+        plt.text(
+            tail_x,
+            14.2,          # slightly lower
+            tail_date,
+            fontsize=8,
+            ha='center',
+            color='grey'
+        )
+
+        # label below the line, slightly above current block height text
+        plt.text(
+            tail_x,
+            -0.4,          # slightly above
+            "0.5 BIS tail",
+            fontsize=8,
+            ha='center',
+            color='grey'
+        )
+
+    # milestone dates a bit lower in y (for milestone lines only)
     for idx, x in enumerate(milestone_x):
         if idx < len(convert_to_date):
             plt.text(x, 14, convert_to_date[idx], fontsize=8)
 
-    # estimated time when rewards hit tail (if we computed it)
-    if tail_label_index is not None and tail_label_index < len(convert_to_date):
-        # tail at 6.95M blocks -> x = 6.95
-        plt.text(6.95, 3, convert_to_date[tail_label_index], fontsize=8)
-
+    # dev, miner, pos block rewards
     plt.plot(block, reward_block_dev,
              color='blue', linestyle='solid', linewidth=2,
              marker='.', markersize=3, label='dev block reward')
 
     plt.plot(block, reward_block_mining,
-             color='#0b8a22', linestyle='solid', linewidth=2,
+             color='#0b8a22', linestyle='solid', linewidth=2,   # dark green
              marker='.', markersize=3, label='miners block reward')
 
     plt.plot(block, reward_block_pos,
@@ -385,33 +461,8 @@ if last_block_mined and network_height and actual_mining_reward:
             xytext=((reward_zero_height / 1_000_000.0), 2),
             arrowprops=dict(facecolor='black', shrink=0.05),
         )
-    
-    # ---------------------------------------
-    # Highlight current block height on plot
-    # ---------------------------------------
 
-    current_x = network_height / 1_000_000.0
-
-    # Light grey vertical line at the current block height
-    plt.axvline(
-        x=current_x,
-        color='lightgrey',
-        linestyle='--',
-        linewidth=1
-    )
-
-    # Label at the bottom (under x-axis area)
-    plt.text(
-        current_x,
-        -0.5,   # slightly below the x-axis
-        f"{network_height:,}",   # formatted 4,556,185
-        ha='center',
-        fontsize=8,
-        color='grey'
-    )
-
-
-    plt.ylim(0, 15)
+    plt.ylim(-0.5, 15)
     plt.xlim(0, 50)
     plt.xlabel('block * 1,000,000')
     plt.ylabel('BIS')
